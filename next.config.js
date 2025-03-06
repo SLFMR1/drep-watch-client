@@ -17,7 +17,7 @@ const nextConfig = {
 
     swcMinify: true,
     
-    webpack: function (config, options) {
+    webpack: (config: any, options: any) => {
         config.experiments = {
             asyncWebAssembly: true,
             layers: true,
