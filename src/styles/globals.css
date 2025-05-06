@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* @import url('lenis-scroll.css'); */
+@import url('custom-scrollbar.css');
+@import url('masonry.css');
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+@layer utilities {
+    .text-shadow {
+        text-shadow: 0px 1px #00000040;
+    }
+
+    .grid-lines {
+        background-size: 63px 63px;
+        background-image:
+            linear-gradient(to right, #EDEDED 1px, transparent 1px),
+            linear-gradient(to bottom, #EDEDED 1px, transparent 1px);
+    }
+
+    .stroke-text {
+        color: black;
+        -webkit-text-fill-color: transparent;
+        -webkit-text-stroke-width: 1.5px;
+        -webkit-text-stroke-color: black;
+        
+        @media screen and (max-width: 768px) {
+            /* Apply a reduced stroke width for screens up to 640px wide (adjust as needed) */
+            -webkit-text-stroke-width: 0.75px;
+        }
+    }
+}
