@@ -670,54 +670,160 @@ const ExplorerPage = () => {
         </div>
         
         <div className="overflow-x-auto rounded-xl border border-primary-light bg-white shadow-color">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-tertiary">
-                  DREP
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-tertiary">
-                  ID
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-tertiary">
-                  Questions Answered
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-tertiary">
-                  Questions Asked
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-tertiary">
-                  Voting Power
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-tertiary">
-                  Activity Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-tertiary">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 bg-white">
-              {(searchQuery.trim() !== "" ? searchResults : processedData.dreps).map((drep: Drep) => (
-                <tr key={drep.drep_id} className="hover:bg-gray-50">
-                  <td className="whitespace-nowrap px-6 py-4">
-                    <Link href={`/profile/${drep.drep_id}`} className="flex items-center gap-3">
-                      <LetterAvatar
-                        username={drep.givenName || drep.drep_id}
-                        dimension={40}
-                        rounded
-                        src={drep.image || null}
-                      />
-                      <span className="font-neue-regrade font-medium text-black">
-                        {drep.givenName || "Unnamed DREP"}
+          {/* Desktop Table View */}
+          <div className="hidden md:block">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-tertiary">
+                    DREP
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-tertiary">
+                    ID
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-tertiary">
+                    Questions Answered
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-tertiary">
+                    Questions Asked
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-tertiary">
+                    Voting Power
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-tertiary">
+                    Activity Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-tertiary">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 bg-white">
+                {(searchQuery.trim() !== "" ? searchResults : processedData.dreps).map((drep: Drep) => (
+                  <tr key={drep.drep_id} className="hover:bg-gray-50">
+                    <td className="whitespace-nowrap px-6 py-4">
+                      <Link href={`/profile/${drep.drep_id}`} className="flex items-center gap-3">
+                        <LetterAvatar
+                          username={drep.givenName || drep.drep_id}
+                          dimension={40}
+                          rounded
+                          src={drep.image || null}
+                        />
+                        <span className="font-neue-regrade font-medium text-black">
+                          {drep.givenName || "Unnamed DREP"}
+                        </span>
+                      </Link>
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4">
+                      <div className="flex items-center space-x-1">
+                        <span className="font-ibm-mono text-sm text-tertiary">
+                          {formatDrepId(drep.drep_id)}
+                        </span>
+                        <button 
+                          onClick={(e) => {
+                            e.preventDefault();
+                            copyToClipboard(drep.drep_id);
+                          }}
+                          className="text-gray-400 hover:text-primary transition-colors"
+                          title="Copy full ID"
+                        >
+                          <MdContentCopy size={16} />
+                        </button>
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4">
+                      <span className="font-inter text-sm text-secondary">{drep.questionsAnswers ?? 0}</span>
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4">
+                      <span className="font-inter text-sm text-secondary">{drep.questionsAsked ?? 0}</span>
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4">
+                      <span className="font-inter text-sm text-secondary">
+                        {drep.voting_power !== null && drep.voting_power !== undefined ? 
+                          (drep.voting_power / 1000000).toLocaleString(undefined, { maximumFractionDigits: 0 }) 
+                          : '0'
+                        } ₳
                       </span>
-                    </Link>
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-4">
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4">
+                      <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${ 
+                        drep.active 
+                          ? "bg-green-100 text-green-800" 
+                          : "bg-red-100 text-red-800"
+                      }`}>
+                        {drep.active ? "Active" : "Inactive"}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={drep.active ? `/ask-question?to=${drep.drep_id}` : "#"}
+                          onClick={(e) => !drep.active && e.preventDefault()}
+                          className={`flex items-center gap-2 rounded-lg px-4 py-2 text-white ${ 
+                            drep.active 
+                              ? "bg-gradient-to-b from-[#FFC896] from-[-47.73%] to-[#FB652B] to-[78.41%]" 
+                              : "bg-gray-300 cursor-not-allowed"
+                          }`}
+                        >
+                          <BsChatQuoteFill className="text-[20px]" />
+                          <span className="text-shadow font-inter text-xs font-medium">
+                            {drep.active ? "Ask" : "Inactive"}
+                          </span>
+                        </Link>
+                        <motion.button
+                          onClick={() => onDelegate(drep.drep_id, Boolean(drep.active))}
+                          disabled={!drep.active}
+                          className={`flex items-center gap-2 rounded-lg px-4 py-2 ${ 
+                            drep.active 
+                              ? "bg-[#EAEAEA] text-secondary" 
+                              : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                          }`}
+                          whileHover={drep.active ? { scaleX: 1.025 } : undefined}
+                          whileTap={drep.active ? { scaleX: 0.995 } : undefined}
+                        >
+                          <span className="font-inter text-xs font-medium">Delegate</span>
+                        </motion.button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                
+                {searchQuery.trim() !== "" && searchResults.length === 0 && !isSearching && (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-10 text-center text-tertiary">
+                      No DREPs found for "{searchQuery}". Try a different search term.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden">
+            {(searchQuery.trim() !== "" ? searchResults : processedData.dreps).map((drep: Drep) => (
+              <div key={drep.drep_id} className="border-b border-gray-200 p-4 last:border-b-0">
+                <div className="flex items-center gap-3 mb-3">
+                  <Link href={`/profile/${drep.drep_id}`} className="flex items-center gap-3">
+                    <LetterAvatar
+                      username={drep.givenName || drep.drep_id}
+                      dimension={40}
+                      rounded
+                      src={drep.image || null}
+                    />
+                    <span className="font-neue-regrade font-medium text-black">
+                      {drep.givenName || "Unnamed DREP"}
+                    </span>
+                  </Link>
+                </div>
+                
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-tertiary">ID:</span>
                     <div className="flex items-center space-x-1">
-                      <span className="font-ibm-mono text-sm text-tertiary">
+                      <span className="font-ibm-mono text-secondary">
                         {formatDrepId(drep.drep_id)}
                       </span>
-
                       <button 
                         onClick={(e) => {
                           e.preventDefault();
@@ -729,22 +835,30 @@ const ExplorerPage = () => {
                         <MdContentCopy size={16} />
                       </button>
                     </div>
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-4">
-                    <span className="font-inter text-sm text-secondary">{drep.questionsAnswers ?? 0}</span>
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-4">
-                    <span className="font-inter text-sm text-secondary">{drep.questionsAsked ?? 0}</span>
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-4">
-                    <span className="font-inter text-sm text-secondary">
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="text-tertiary">Questions Answered:</span>
+                    <span className="text-secondary">{drep.questionsAnswers ?? 0}</span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="text-tertiary">Questions Asked:</span>
+                    <span className="text-secondary">{drep.questionsAsked ?? 0}</span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="text-tertiary">Voting Power:</span>
+                    <span className="text-secondary">
                       {drep.voting_power !== null && drep.voting_power !== undefined ? 
                         (drep.voting_power / 1000000).toLocaleString(undefined, { maximumFractionDigits: 0 }) 
                         : '0'
                       } ₳
                     </span>
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-4">
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="text-tertiary">Status:</span>
                     <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${ 
                       drep.active 
                         ? "bg-green-100 text-green-800" 
@@ -752,50 +866,47 @@ const ExplorerPage = () => {
                     }`}>
                       {drep.active ? "Active" : "Inactive"}
                     </span>
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <Link
-                        href={drep.active ? `/ask-question?to=${drep.drep_id}` : "#"}
-                        onClick={(e) => !drep.active && e.preventDefault()}
-                        className={`flex items-center gap-2 rounded-lg px-4 py-2 text-white ${ 
-                          drep.active 
-                            ? "bg-gradient-to-b from-[#FFC896] from-[-47.73%] to-[#FB652B] to-[78.41%]" 
-                            : "bg-gray-300 cursor-not-allowed"
-                        }`}
-                      >
-                        <BsChatQuoteFill className="text-[20px]" />
-                        <span className="text-shadow font-inter text-xs font-medium">
-                          {drep.active ? "Ask" : "Inactive"}
-                        </span>
-                      </Link>
-                      <motion.button
-                        onClick={() => onDelegate(drep.drep_id, Boolean(drep.active))}
-                        disabled={!drep.active}
-                        className={`flex items-center gap-2 rounded-lg px-4 py-2 ${ 
-                          drep.active 
-                            ? "bg-[#EAEAEA] text-secondary" 
-                            : "bg-gray-200 text-gray-500 cursor-not-allowed"
-                        }`}
-                        whileHover={drep.active ? { scaleX: 1.025 } : undefined}
-                        whileTap={drep.active ? { scaleX: 0.995 } : undefined}
-                      >
-                        <span className="font-inter text-xs font-medium">Delegate</span>
-                      </motion.button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              
-              {searchQuery.trim() !== "" && searchResults.length === 0 && !isSearching && (
-                <tr>
-                  <td colSpan={7} className="px-6 py-10 text-center text-tertiary">
-                    No DREPs found for "{searchQuery}". Try a different search term.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 mt-4">
+                  <Link
+                    href={drep.active ? `/ask-question?to=${drep.drep_id}` : "#"}
+                    onClick={(e) => !drep.active && e.preventDefault()}
+                    className={`flex-1 flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-white ${ 
+                      drep.active 
+                        ? "bg-gradient-to-b from-[#FFC896] from-[-47.73%] to-[#FB652B] to-[78.41%]" 
+                        : "bg-gray-300 cursor-not-allowed"
+                    }`}
+                  >
+                    <BsChatQuoteFill className="text-[20px]" />
+                    <span className="text-shadow font-inter text-xs font-medium">
+                      {drep.active ? "Ask" : "Inactive"}
+                    </span>
+                  </Link>
+                  <motion.button
+                    onClick={() => onDelegate(drep.drep_id, Boolean(drep.active))}
+                    disabled={!drep.active}
+                    className={`flex-1 flex items-center justify-center gap-2 rounded-lg px-4 py-2 ${ 
+                      drep.active 
+                        ? "bg-[#EAEAEA] text-secondary" 
+                        : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                    }`}
+                    whileHover={drep.active ? { scaleX: 1.025 } : undefined}
+                    whileTap={drep.active ? { scaleX: 0.995 } : undefined}
+                  >
+                    <span className="font-inter text-xs font-medium">Delegate</span>
+                  </motion.button>
+                </div>
+              </div>
+            ))}
+            
+            {searchQuery.trim() !== "" && searchResults.length === 0 && !isSearching && (
+              <div className="px-6 py-10 text-center text-tertiary">
+                No DREPs found for "{searchQuery}". Try a different search term.
+              </div>
+            )}
+          </div>
         </div>
 
         {searchQuery.trim() === "" && renderPagination()}

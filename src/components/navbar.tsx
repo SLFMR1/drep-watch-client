@@ -180,7 +180,7 @@ const Navbar: React.FC = (): React.ReactNode => {
   });
 
   return (
-    <div className="pointer-events-none fixed left-0 top-7 z-[10] flex w-screen items-center justify-center ">
+    <div className="pointer-events-none fixed left-0 top-7 z-[10] flex w-screen items-center justify-center px-4 md:px-0">
       <motion.header
         className="pointer-events-auto flex w-auto items-center justify-between gap-8 rounded-[14px] bg-[#303030] p-2 pl-6 shadow-sm md:min-w-[500px]"
         whileHover={{ width: device !== "mobile" ? "600px" : "auto" }}
@@ -196,7 +196,7 @@ const Navbar: React.FC = (): React.ReactNode => {
             alt="logo"
           />
 
-          <div className="font-inter text-sm font-medium tracking-wide text-white md:text-base">
+          <div className="hidden md:block font-inter text-sm font-medium tracking-wide text-white md:text-base">
             dRepWatch
           </div>
         </Link>
@@ -220,7 +220,7 @@ const Navbar: React.FC = (): React.ReactNode => {
             <motion.button
               whileHover={{ scaleX: 1.025 }}
               whileTap={{ scaleX: 0.995 }}
-              className="flex items-center gap-2.5 rounded-lg bg-gradient-to-b from-[#FFC896] from-[-47.73%] to-[#FB652B] to-[78.41%] px-4 py-2.5  text-white md:px-6"
+              className="flex items-center gap-2.5 rounded-lg bg-gradient-to-b from-[#FFC896] from-[-47.73%] to-[#FB652B] to-[84.41%] px-4 py-2.5  text-white md:px-6"
             >
               {connecting ? (
                 <Loader colored={true} />
@@ -235,7 +235,7 @@ const Navbar: React.FC = (): React.ReactNode => {
               ) : (
                 <IoWalletSharp className="text-[24px]" />
               )}
-              <div className="text-shadow font-inter text-xs font-medium md:text-sm ">
+              <div className="text-shadow font-inter text-xs font-light md:text-sm ">
                 {connecting ? (
                   "Connecting..."
                 ) : connected ? (
