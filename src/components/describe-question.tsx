@@ -85,32 +85,77 @@ const Questions = (): React.ReactNode => {
   };
 
   const fetchData = async () => {
-    try {
-      if (!query.to) {
-        return;
-      }
-
-      const response = await axios.post<{
-        questionsAsked: number;
-        questionsAnswers: number;
-        image?: string;
-        name?: string;
-      }>(`${BASE_API_URL}/api/v1/drep/drep-profile`, { drep_id: query.to });
-      // setProfileData(response.data);
-
-      return response.data;
-      //   console.log(data);
-    } catch (error: unknown) {
-      if (
-        error instanceof AxiosError &&
-        error.response &&
-        error.response.data
-      ) {
-        const responseData = error.response.data;
-        console.log(responseData);
-      }
-      console.log(error);
+    const drepId = query.to as string;
+    if (!drepId) {
+      console.error("No DRep ID (query.to) available for fetching profile data in describe-question.");
+      // Return a default structure or throw an error, ensuring the hook expects this outcome
+      return {
+        name: "DRep ID missing",
+        questionsAsked: 0,
+        questionsAnswers: 0,
+        image: undefined,
+        // Initialize other fields expected by the User component if necessary
+      };
     }
+
+    let profileDetails: any = {
+      questionsAsked: 0,
+      questionsAnswers: 0,
+    };
+
+    try {
+      // 1. Fetch primary profile data
+      const profileResponse = await axios.post(
+        `${BASE_API_URL}/api/v1/drep/drep-profile`,
+        { drep_id: drepId },
+      );
+      if (profileResponse.data && typeof profileResponse.data === 'object') {
+        profileDetails = { ...profileDetails, ...profileResponse.data };
+        profileDetails.questionsAsked = Number(profileDetails.questionsAsked) || 0;
+        profileDetails.questionsAnswers = Number(profileDetails.questionsAnswers) || 0;
+      } else {
+        console.warn(`No data or unexpected format from /drep-profile for ${drepId} in describe-question.`);
+      }
+    } catch (error) {
+      console.error(`Error fetching from /drep-profile for ${drepId} in describe-question:`, error);
+      if (!profileDetails.name) profileDetails.name = "Error Loading Name";
+    }
+
+    try {
+      // 2. Fetch data from indexed source for accurate counts and potentially other details
+      const indexedResponse = await axios.get(
+        `${BASE_API_URL}/api/v1/drep/indexed/search?query=${drepId}`
+      );
+
+      if (indexedResponse.data && Array.isArray(indexedResponse.data) && indexedResponse.data.length > 0) {
+        const indexedDrep = indexedResponse.data[0];
+        
+        profileDetails.questionsAsked = indexedDrep.questions_asked_count ?? profileDetails.questionsAsked;
+        profileDetails.questionsAnswers = indexedDrep.questions_answered_count ?? profileDetails.questionsAnswers;
+
+        if (indexedDrep.name && (!profileDetails.name || profileDetails.name === "Error Loading Name")) {
+          profileDetails.name = indexedDrep.name;
+        }
+        if (indexedDrep.image_url && !profileDetails.image) {
+          profileDetails.image = indexedDrep.image_url;
+        }
+        // Add other fields like references if your User component uses them
+      } else {
+        console.log(`No indexed data found for DRep ID: ${drepId} in describe-question. Using existing or default counts.`);
+      }
+    } catch (error) {
+      console.error(`Error fetching from /indexed/search for ${drepId} in describe-question:`, error);
+    }
+    
+    console.log(`[describe-question.tsx] Merged profile data for ${drepId}:`, profileDetails);
+    // Ensure the returned object matches the expected type for profileData
+    // Explicitly define the return type if needed by the useQuery hook
+    return profileDetails as {
+      questionsAsked: number;
+      questionsAnswers: number;
+      image?: string;
+      name?: string;
+    };
   };
 
   const {

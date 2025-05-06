@@ -30,7 +30,7 @@ import Masonry from "react-masonry-css";
 import { useWalletStore } from "~/store/wallet";
 import { buildSubmitConwayTx } from "~/core/delegateVote";
 import { shareDrepProfile, extractXHandle } from "~/utils/share";
-import { BrowserWallet } from "@meshsdk/core";
+import { type BrowserWallet } from '@meshsdk/core';
 
 interface Reference {
   "@type": string;
@@ -116,35 +116,74 @@ const Profile: React.FC = (): React.ReactNode => {
     checkDrepStatus();
   }, [query.id]);
 
-  const fetchData = async () => {
-    try {
-      if (!query.id) {
-        throw new Error("No drep ID found");
-      }
-      
-      const response = await axios.post<ProfileData>(`${BASE_API_URL}/api/v1/drep/drep-profile`, { 
-        drep_id: query.id 
-      });
-      
-      console.log("Profile data received:", response.data);
-      console.log("References structure:", JSON.stringify(response.data.references, null, 2));
-      return response.data;
-    } catch (error: unknown) {
-      if (error instanceof AxiosError && error?.response?.data) {
-        const responseData = error?.response?.data as unknown;
-        console.log("API error:", responseData);
-      } else {
-        console.log("Error fetching profile:", error);
-      }
-      throw error;
-    }
-  };
-
   const { data: profileData, error: err1 } = useQuery<ProfileData, Error>({
     queryKey: ["drep-profile", query?.id],
-    queryFn: () => fetchData(),
+    queryFn: async () => {
+      const currentDrepId = query.id as string;
+      if (!currentDrepId) {
+        console.error("No DRep ID available for fetching profile data.");
+        throw new Error("DRep ID is required to fetch profile data.");
+      }
+
+      let profileDetails: Partial<ProfileData> = {
+        questionsAsked: 0,
+        questionsAnswers: 0,
+        references: [],
+      };
+
+      try {
+        const profileResponse = await axios.post<ProfileData>(
+          `${BASE_API_URL}/api/v1/drep/drep-profile`,
+          { drep_id: currentDrepId },
+        );
+        if (profileResponse.data && typeof profileResponse.data === 'object') {
+          profileDetails = { ...profileDetails, ...profileResponse.data };
+          profileDetails.questionsAsked = Number(profileDetails.questionsAsked) || 0;
+          profileDetails.questionsAnswers = Number(profileDetails.questionsAnswers) || 0;
+        } else {
+          console.warn(`No data or unexpected format from /drep-profile for ${currentDrepId}`);
+        }
+      } catch (error) {
+        console.error(`Error fetching from /drep-profile for ${currentDrepId}:`, error);
+        if (!profileDetails.name) profileDetails.name = "Error Loading Name";
+      }
+
+      try {
+        const indexedResponse = await axios.get(
+          `${BASE_API_URL}/api/v1/drep/indexed/search?query=${currentDrepId}`
+        );
+
+        if (indexedResponse.data && Array.isArray(indexedResponse.data) && indexedResponse.data.length > 0) {
+          const indexedDrep = indexedResponse.data[0];
+          
+          profileDetails.questionsAsked = indexedDrep.questions_asked_count ?? profileDetails.questionsAsked;
+          profileDetails.questionsAnswers = indexedDrep.questions_answered_count ?? profileDetails.questionsAnswers;
+          profileDetails.drep_id = indexedDrep.drep_id ?? profileDetails.drep_id;
+          profileDetails.voting_power = indexedDrep.voting_power?.toString() ?? profileDetails.voting_power;
+
+          if (indexedDrep.name && (!profileDetails.name || profileDetails.name === "Error Loading Name")) {
+            profileDetails.name = indexedDrep.name;
+          }
+          if (indexedDrep.image_url && !profileDetails.image) {
+            profileDetails.image = indexedDrep.image_url;
+          }
+          if (indexedDrep.references && (!profileDetails.references || profileDetails.references.length === 0)) {
+             profileDetails.references = indexedDrep.references;
+          }
+          
+        } else {
+          console.log(`No indexed data found for DRep ID: ${currentDrepId}. Counts might be from /drep-profile or default to 0.`);
+        }
+      } catch (error) {
+        console.error(`Error fetching from /indexed/search for ${currentDrepId}:`, error);
+      }
+      
+      console.log(`[profile.tsx] Merged profile data for ${currentDrepId}:`, profileDetails);
+      return profileDetails as ProfileData;
+    },
     enabled: !!query.id,
   });
+
   const {
     data: questions,
     error: err2,
@@ -208,15 +247,13 @@ const Profile: React.FC = (): React.ReactNode => {
   }
 
   const handleShare = () => {
-    if (query.id && typeof query.id === 'string') {
+    if (canonicalDrepId && profileData) {
       let xHandle: string | undefined = undefined;
-      
-      if (profileData?.references && profileData.references.length > 0) {
+      if (profileData.references && profileData.references.length > 0) {
         const xRef = profileData.references.find((ref: Reference) => {
           const uri = typeof ref.uri === 'string' ? ref.uri : ref.uri["@value"];
           return uri && (uri.includes('twitter.com') || uri.includes('x.com'));
         });
-        
         if (xRef) {
           const uri = typeof xRef.uri === 'string' ? xRef.uri : xRef.uri["@value"];
           const handle = extractXHandle(uri);
@@ -225,8 +262,7 @@ const Profile: React.FC = (): React.ReactNode => {
           }
         }
       }
-      
-      shareDrepProfile(query.id, profileData?.name, xHandle);
+      shareDrepProfile(canonicalDrepId, profileData.name, xHandle);
     }
   };
 
@@ -244,30 +280,25 @@ const Profile: React.FC = (): React.ReactNode => {
 
       const address = (await wallet.getRewardAddresses())[0];
 
-      if (!address) {
+      if (!address || !canonicalDrepId) {
+        toast.error("Required information for delegation is missing.");
         return;
       }
 
-      const poolId = canonicalDrepId;
-
-      if (!poolId) {
-        return;
-      }
-
-      const txHash = await buildSubmitConwayTx(true, wallet as BrowserWallet, poolId);
+      const txHash = await buildSubmitConwayTx(true, wallet as BrowserWallet, canonicalDrepId);
 
       if (txHash) {
         toast.success(
-          `Successfully delegated to ${canonicalDrepId}. Transaction Hash: ${txHash}`,
+          `Successfully delegated to ${profileData?.name || canonicalDrepId}. Transaction Hash: ${txHash}`,
         );
       } else {
-        throw new Error("Failed to delegate. Please try again.");
+        throw new Error('Failed to delegate. Please try again.');
       }
     } catch (error) {
       if (error instanceof Error) {
         toast.error(error.message);
       }
-      console.log(error);
+      console.log("Delegation error:", error);
     }
   };
 

@@ -90,6 +90,7 @@ import {
 import { useState } from "react";
 import { buildSubmitConwayTx } from "~/core/delegateVote";
 import { shareQuestionAnswer, extractXHandle } from "~/utils/share";
+import { type BrowserWallet } from '@meshsdk/core';
 
 const protocolParams = {
   linearFee: {
@@ -169,24 +170,59 @@ const Answer: React.FC = (): React.ReactNode => {
 
   const fetchData = async () => {
     try {
-      if (!data?.question.drep_id) return;
-      const response = await axios.post(
-        `${BASE_API_URL}/api/v1/drep/drep-profile`,
-        { drep_id: data?.question.drep_id },
-      );
-      
-      console.log("Profile data received:", response.data);
-      return response.data;
-    } catch (error: unknown) {
-      if (
-        error instanceof AxiosError &&
-        error.response &&
-        error.response.data
-      ) {
-        const responseData = error.response.data;
-        console.log(responseData);
+      if (!data?.question.drep_id) return null; 
+
+      let originalProfileData: any = {}; 
+      try {
+        const profileResponse = await axios.post(
+          `${BASE_API_URL}/api/v1/drep/drep-profile`,
+          { drep_id: data.question.drep_id },
+        );
+        originalProfileData = profileResponse.data || {};
+         // Ensure baseline counts exist, even if 0, before attempting to overwrite
+        originalProfileData.questionsAsked = originalProfileData.questionsAsked ?? 0;
+        originalProfileData.questionsAnswers = originalProfileData.questionsAnswers ?? 0;
+      } catch (profileError) {
+        console.error("Error fetching from /drep-profile:", profileError);
+        // Initialize with default structure if main profile fetch fails, to prevent undefined errors
+        originalProfileData = { name: "Error Loading Name", questionsAsked: 0, questionsAnswers: 0, references: [] };
       }
-      console.log(error);
+
+      // 2. Fetch accurate counts from indexed search
+      try {
+        const countsResponse = await axios.get(
+          `${BASE_API_URL}/api/v1/drep/indexed/search?query=${data.question.drep_id}`
+        );
+
+        if (countsResponse.data && Array.isArray(countsResponse.data) && countsResponse.data.length > 0) {
+          const indexedDrepData = countsResponse.data[0];
+          if (indexedDrepData) { // Check if indexedDrepData is not null/undefined
+            originalProfileData.questionsAsked = indexedDrepData.questions_asked_count ?? originalProfileData.questionsAsked;
+            originalProfileData.questionsAnswers = indexedDrepData.questions_answered_count ?? originalProfileData.questionsAnswers;
+            // Preserve other fields from originalProfileData, like 'name' and 'references'
+            // Only update counts if available from indexed source
+            if (indexedDrepData.name && !originalProfileData.name) { // Populate name if missing
+                 originalProfileData.name = indexedDrepData.name;
+            }
+            if (indexedDrepData.references && (!originalProfileData.references || originalProfileData.references.length === 0)) {
+                originalProfileData.references = indexedDrepData.references;
+            }
+          }
+        } else {
+          console.log(`No indexed data found for DRep ID: ${data.question.drep_id}. Using counts from /drep-profile or defaults.`);
+        }
+      } catch (countsError) {
+        console.error("Error fetching from /indexed/search:", countsError);
+        // If counts fetch fails, we'll use whatever was in originalProfileData (or its defaults)
+      }
+      
+      console.log("(Merged) Profile data with updated counts:", originalProfileData);
+      return originalProfileData;
+
+    } catch (error: unknown) { // General catch for the outer try
+      console.error("Error in fetchData (outer):", error);
+      // Return a default structure on general failure to ensure UI stability
+      return { name: "Error Loading Profile", questionsAsked: 0, questionsAnswers: 0, references: [] };
     }
   };
 
@@ -222,7 +258,7 @@ const Answer: React.FC = (): React.ReactNode => {
         return;
       }
 
-      const txHash = await buildSubmitConwayTx(true, wallet, poolId);
+      const txHash = await buildSubmitConwayTx(true, wallet as BrowserWallet, poolId);
 
       if (txHash) {
         toast.success(
@@ -244,7 +280,7 @@ const Answer: React.FC = (): React.ReactNode => {
       let xHandle: string | undefined = undefined;
       
       if (profileData?.references && profileData.references.length > 0) {
-        const xRef = profileData.references.find(ref => {
+        const xRef = profileData.references.find((ref: Reference) => {
           const uri = typeof ref.uri === 'string' ? ref.uri : ref.uri["@value"];
           return uri && (uri.includes('twitter.com') || uri.includes('x.com'));
         });

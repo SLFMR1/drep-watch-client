@@ -68,6 +68,16 @@ const QueAnsCard: React.FC<QueAnsCardProps> = ({
   // Only allow editing if large, unanswered, and user is dRep
   const canEdit = large && question?.drep_id && is_admin.drep_id && question.drep_id === is_admin.drep_id && !answer?.answer;
 
+  // Initialize edit mode if canEdit
+  useEffect(() => {
+    if (canEdit) {
+      setIsEdit(true);
+    } else {
+      setIsEdit(false);
+      setNewValue("");
+    }
+  }, [canEdit, answer]);
+
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const inputValue = e.target.value;
     if (inputValue.length <= MAX_LIMIT) {
@@ -107,6 +117,7 @@ const QueAnsCard: React.FC<QueAnsCardProps> = ({
         await queryClient.invalidateQueries({ queryKey: ['drep-profile', drepIDFromStore] });
         await queryClient.invalidateQueries({ queryKey: ['latest_questions'] });
         await queryClient.invalidateQueries({ queryKey: ['drep_questions', drepIDFromStore] });
+        await queryClient.invalidateQueries({ queryKey: ['answer-data', id] });
         setSaving(false);
       } else {
         toast.error("Failed to update answer. Please try again.");
@@ -199,7 +210,7 @@ const QueAnsCard: React.FC<QueAnsCardProps> = ({
         )}
 
         {/* Editable only if large, unanswered, and dRep */}
-        {canEdit && (
+        {canEdit && isEdit && (
           <div className="flex w-full flex-col gap-1.5">
             <div className="flex w-full items-center justify-between">
               <div className="text-primary">Answer</div>
@@ -236,7 +247,7 @@ const QueAnsCard: React.FC<QueAnsCardProps> = ({
         )}
 
         {/* If not editable, show static placeholder for unanswered in large view only */}
-        {!canEdit && large && question?.drep_id && is_admin.drep_id && question.drep_id === is_admin.drep_id && !answer?.answer && (
+        {large && question?.drep_id && is_admin.drep_id && question.drep_id === is_admin.drep_id && !answer?.answer && !isEdit && (
           <div className="flex w-full flex-col gap-1.5">
             <div className="flex w-full items-center justify-between">
               <div className="text-primary">Answer</div>
