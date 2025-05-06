@@ -229,8 +229,8 @@ const Navbar: React.FC = (): React.ReactNode => {
                   width={1000}
                   height={1000}
                   className="h-6 w-6 object-contain"
-                  src={WALLETS[name.toLowerCase()]?.image ?? ""}
-                  alt={WALLETS[name.toLowerCase()]?.title ?? ""}
+                  src={WALLETS[name?.toLowerCase() ?? '']?.image ?? ""}
+                  alt={WALLETS[name?.toLowerCase() ?? '']?.title ?? ""}
                 />
               ) : (
                 <IoWalletSharp className="text-[24px]" />
@@ -374,6 +374,20 @@ const Navbar: React.FC = (): React.ReactNode => {
                       </div>
                     </div>
                   </div>
+
+                  {connected && (
+                    <Link href="/my-questions">
+                      <div className="flex w-full items-center justify-center border-b border-brd-clr py-3">
+                        <motion.button
+                          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
+                          whileHover={{ scaleX: 1.025 }}
+                          whileTap={{ scaleX: 0.995 }}
+                        >
+                          Show all my Questions
+                        </motion.button>
+                      </div>
+                    </Link>
+                  )}
 
                   <div className="max-h-[400px] w-full  overflow-auto ">
                     <div className="flex w-full flex-col items-start gap-1.5 ">
