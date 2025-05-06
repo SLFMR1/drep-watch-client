@@ -394,6 +394,7 @@ const Navbar: React.FC = (): React.ReactNode => {
                             notification_id={notification.id}
                             afterOpen={() => refetch()}
                             user={notification.user}
+                            role={notification.role}
                           />
                         ))
                       )}
@@ -427,6 +428,7 @@ function NotificationItem({
   user: string;
   notification_id: string;
   afterOpen: () => void;
+  role: string;
 }) {
   const router = useRouter();
 
@@ -452,7 +454,7 @@ function NotificationItem({
         <div>
           <LetterAvatar
             rounded
-            username={is_admin?.drep_id ? props.user : props.username}
+            username={props.role === "Admin" ? props.user : props.username}
             dimension={32}
           />
         </div>
@@ -463,10 +465,10 @@ function NotificationItem({
       >
         <div>
           <span className="mr-1 font-bold">
-            {(is_admin?.drep_id ? props.user : props.username).slice(0, 16)}...
+            {(props.role === "Admin" ? props.user : props.username).slice(0, 16)}...
           </span>
           <span>
-            {is_admin?.drep_id
+            {props.role === "Admin"
               ? "asked you a question"
               : "answered your question"}
           </span>
@@ -492,7 +494,7 @@ function NotificationItem({
             onClick={onOpen}
             className="rounded-lg border border-primary px-4 py-2 text-primary hover:bg-primary/5"
           >
-            {is_admin?.drep_id ? "Answer" : "Read more"}
+            {props.role === "Admin" ? "Answer" : "Read more"}
           </button>
         </div>
       </div>
