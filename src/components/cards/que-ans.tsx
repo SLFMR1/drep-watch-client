@@ -54,20 +54,19 @@ const QueAnsCard: React.FC<QueAnsCardProps> = ({
 
   const [enlargeText, setEnlargeText] = useState(false);
 
-  // add from here
+  // Editing state for large view, unanswered, and dRep only
   const MAX_LIMIT = 6000;
-  const [value, setValue] = useState<string>(answer?.answer ?? "");
-  const [newValue, setNewValue] = useState<string>(answer?.answer ?? "");
-
-  const [currentLimit, setCurrentLimit] = useState<number>(
-    MAX_LIMIT - value?.length,
-  );
-  const textAreaRef = useRef<HTMLTextAreaElement>(null);
+  const [newValue, setNewValue] = useState<string>("");
+  const [currentLimit, setCurrentLimit] = useState<number>(MAX_LIMIT);
   const [isEdit, setIsEdit] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
+  const textAreaRef = useRef<HTMLTextAreaElement>(null);
 
   const { is_admin } = useWalletStore();
   const { wallet } = useWallet();
+
+  // Only allow editing if large, unanswered, and user is dRep
+  const canEdit = large && question?.drep_id && is_admin.drep_id && question.drep_id === is_admin.drep_id && !answer?.answer;
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const inputValue = e.target.value;
@@ -77,113 +76,54 @@ const QueAnsCard: React.FC<QueAnsCardProps> = ({
     }
   };
 
-  const toggleEditMode = () => {
-    setIsEdit(!isEdit);
-  };
-
   const handleCancel = () => {
-    setNewValue(value); // Revert to original value
-    setIsEdit(false); // Exit edit mode
+    setNewValue("");
+    setIsEdit(false);
+    setCurrentLimit(MAX_LIMIT);
   };
 
   const handleSave = async () => {
     try {
       setSaving(true);
-      setIsEdit(false); // Exit edit mode
-      setValue(newValue);
-
+      setIsEdit(false);
       // Use the DRep ID from the store (already converted to CIP-129 during login)
       const drepIDFromStore = is_admin.drep_id;
-
       if (!is_admin.active || !id || !drepIDFromStore) {
-        console.error("Missing required data for saving answer:", {
-          isAdminActive: is_admin.active,
-          questionId: id,
-          drepId: drepIDFromStore,
-        });
         toast.error("Cannot save answer. Required information is missing.");
-        setSaving(false); // Ensure saving state is reset
+        setSaving(false);
         return;
       }
-      
-      console.log(`(QueAnsCard) Using DRep ID from store: ${drepIDFromStore}`);
-
-      const reqBody: {
-        answer: string;
-        uuid: string;
-        drep_id: string; // Send the CIP-129 ID
-        drep_name?: string | undefined;
-      } = {
+      const reqBody = {
         answer: newValue,
-        drep_id: drepIDFromStore, // Use the ID from the store
+        drep_id: drepIDFromStore,
         uuid: id,
       };
-      
-      console.log("(QueAnsCard) Request body being sent:", reqBody);
-
-
       const { data } = await axios.post(
         `${BASE_API_URL}/api/v1/answers/reply`,
         reqBody,
       );
-
       if (data?.savedAnswer) {
         toast.success("Your answer is updated!");
-        // Invalidate queries to refetch data
-        // Use the *CIP-129* ID from the store for invalidation keys
         await queryClient.invalidateQueries({ queryKey: ['drep-profile', drepIDFromStore] });
-        await queryClient.invalidateQueries({ queryKey: ['latest_questions'] }); // Invalidate general lists
-        await queryClient.invalidateQueries({ queryKey: ['drep_questions', drepIDFromStore] }); // Invalidate specific dRep questions list
-
+        await queryClient.invalidateQueries({ queryKey: ['latest_questions'] });
+        await queryClient.invalidateQueries({ queryKey: ['drep_questions', drepIDFromStore] });
         setSaving(false);
       } else {
-        // Handle potential API error where savedAnswer is not returned
         toast.error("Failed to update answer. Please try again.");
         setSaving(false);
       }
     } catch (error) {
-      console.error("Error saving answer:", error); // Log the actual error
       toast.error("An error occurred while saving the answer.");
-      setSaving(false); // Ensure saving state is reset on error
+      setSaving(false);
     }
   };
 
-  const renderCharacterLimit = () => {
-    const characterLimitText = `${currentLimit} Characters left`;
-    const textColor = currentLimit < 10 ? "text-red-600" : "text-secondary/60";
-    return isEdit ? (
-      <div className={textColor + " text-sm"}>{characterLimitText}</div>
-    ) : null;
-  };
-
+  // Autofocus textarea when entering edit mode
   useEffect(() => {
-    setNewValue(answer?.answer ?? "");
-    setValue(answer?.answer ?? "");
-  }, [answer?.answer]);
-
-  const renderButtons = (saving: boolean) => {
-    return (
-      <div className="flex w-full items-center justify-end gap-3">
-        <button
-          disabled={saving}
-          className="rounded-lg border border-brd-clr px-4 py-2.5 font-semibold text-secondary-dark disabled:opacity-60"
-          onClick={handleCancel}
-        >
-          Cancel
-        </button>
-        <button
-          className="rounded-lg border border-primary bg-primary px-4 py-2.5 font-semibold text-white"
-          onClick={handleSave}
-        >
-          {saving ? <Loader colored={true} /> : "Save"}
-        </button>
-      </div>
-    );
-  };
-
-  useEffect(() => {
-    console.log(is_admin);
-  }, [is_admin]);
+    if (isEdit && textAreaRef.current) {
+      textAreaRef.current.focus();
+    }
+  }, [isEdit]);
 
   const handleShare = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -258,51 +198,74 @@ const QueAnsCard: React.FC<QueAnsCardProps> = ({
           </div>
         )}
 
-        {/*  change is_admin to original var */}
-        {large && question?.drep_id && is_admin.drep_id && question.drep_id === is_admin.drep_id && (
-          <>
-            <div className="flex w-full flex-col gap-1.5">
-              <div className="flex w-full items-center justify-between">
-                <div className="text-primary">Answer</div>
-                <div className="flex items-center gap-5 text-base">
-                  {!isEdit && (
-                    <button
-                      onClick={toggleEditMode}
-                      className="rounded-lg border border-primary px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/5 disabled:opacity-60"
-                    >
-                      Edit
-                    </button>
-                  )}
-                </div>
-              </div>
-              {isEdit ? (
-                <textarea
-                  ref={textAreaRef}
-                  className="w-full resize-y rounded-lg border border-brd-clr px-3.5 py-2.5 font-normal text-secondary outline-none"
-                  value={newValue}
-                  onChange={handleChange}
-                  placeholder="Type your answer"
-                  rows={5}
-                  disabled={!isEdit}
-                />
-              ) : (
-                <div
-                  onClick={toggleEditMode} // Allow entering edit mode by clicking the text
-                  className="min-h-[100px] w-full cursor-text whitespace-pre-wrap rounded-lg border border-transparent px-3.5 py-2.5 font-normal text-secondary"
-                >
-                  {value || <span className="text-gray-400">Type your answer</span>}
-                </div>
-              )}
-              {renderCharacterLimit()}
+        {/* Editable only if large, unanswered, and dRep */}
+        {canEdit && (
+          <div className="flex w-full flex-col gap-1.5">
+            <div className="flex w-full items-center justify-between">
+              <div className="text-primary">Answer</div>
             </div>
-            {(isEdit || saving) && renderButtons(saving)}
-          </>
+            <textarea
+              ref={textAreaRef}
+              className="w-full resize-y rounded-lg border border-brd-clr px-3.5 py-2.5 font-normal text-secondary outline-none"
+              value={newValue}
+              onChange={handleChange}
+              placeholder="Type your answer"
+              rows={5}
+              disabled={saving}
+            />
+            <div className={currentLimit < 10 ? "text-red-600 text-sm" : "text-secondary/60 text-sm"}>
+              {currentLimit} Characters left
+            </div>
+            <div className="flex w-full items-center justify-end gap-3">
+              <button
+                disabled={saving}
+                className="rounded-lg border border-brd-clr px-4 py-2.5 font-semibold text-secondary-dark disabled:opacity-60"
+                onClick={handleCancel}
+              >
+                Cancel
+              </button>
+              <button
+                className="rounded-lg border border-primary bg-primary px-4 py-2.5 font-semibold text-white"
+                onClick={handleSave}
+                disabled={saving || newValue.trim().length === 0}
+              >
+                {saving ? <Loader colored={true} /> : "Save"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* If not editable, show static placeholder for unanswered in large view only */}
+        {!canEdit && large && question?.drep_id && is_admin.drep_id && question.drep_id === is_admin.drep_id && !answer?.answer && (
+          <div className="flex w-full flex-col gap-1.5">
+            <div className="flex w-full items-center justify-between">
+              <div className="text-primary">Answer</div>
+            </div>
+            <div className="min-h-[100px] w-full whitespace-pre-wrap rounded-lg border border-transparent px-3.5 py-2.5 font-normal text-secondary">
+              <span className="text-gray-400">Type your answer</span>
+            </div>
+          </div>
+        )}
+
+        {/* In small view, show 'Answer' button for unanswered questions by dRep */}
+        {!large && question?.drep_id && is_admin.drep_id && question.drep_id === is_admin.drep_id && !answer?.answer && (
+          <div className="flex w-full flex-col gap-1.5 items-start mt-2">
+            <button
+              className="rounded-lg bg-gradient-to-b from-[#FFC896] from-[-47.73%] to-[#FB652B] to-[78.41%] px-4 py-2.5 text-white font-semibold text-sm shadow-md hover:brightness-105 transition"
+              onClick={e => {
+                e.stopPropagation();
+                if (id) window.location.href = `/answer/${id}`;
+              }}
+            >
+              Answer
+            </button>
+          </div>
         )}
       </div>
 
       {/* === START: Moved Tags Section === */}
       {question?.theme && question.theme.split(",").filter((word) => word.length > 0).length > 0 && (
-        <div className="flex items-center justify-between gap-5 px-[18px] pb-4 pt-2"> {/* Added padding */}
+        <div className="flex items-center justify-between gap-5 px-[18px] pb-4 pt-2">
           <div className="flex items-center gap-2">
             <div className="font-ibm-mono text-xs font-medium text-tertiary md:text-sm">
             </div>
@@ -312,7 +275,7 @@ const QueAnsCard: React.FC<QueAnsCardProps> = ({
                 .filter((word) => word.length > 0)
                 .map((i) => (
                   <div
-                    className="max-w-[200px] truncate rounded-full bg-gray-100 px-3 py-1 font-inter text-xs font-medium text-[#444] md:text-[13px]" // Changed bg to gray-100 for visibility
+                    className="max-w-[200px] truncate rounded-full bg-gray-100 px-3 py-1 font-inter text-xs font-medium text-[#444] md:text-[13px]"
                     title={i}
                     key={i}
                   >
@@ -321,34 +284,12 @@ const QueAnsCard: React.FC<QueAnsCardProps> = ({
                 ))}
             </div>
           </div>
-          {/* Share button specific to tags might not be needed if it's already in the header */}
-          {/* 
-            <motion.button
-              className="cursor-pointer"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={async (e) => {
-                e.stopPropagation(); // Prevent card click-through if needed
-                try {
-                  await navigator.clipboard.writeText(
-                    `${window.location.protocol}//${window.location.hostname}${window.location.port ? `:${window.location.port}` : ""}/answer/` +
-                      id,
-                  );
-                  toast.success("Copied the sharing link");
-                } catch (err) {
-                  toast.error("Failed to copy to clipboard");
-                }
-              }}
-            >
-              <MdShare className="text-lg text-[#8c8c8c] md:text-xl" />
-            </motion.button> 
-          */}
         </div>
       )}
       {/* === END: Moved Tags Section === */}
 
       {answer?.answer && (
-        <div className="flex flex-col justify-start gap-6 bg-[#F5F5F5] px-[18px] py-5"> {/* Reduced gap */}
+        <div className="flex flex-col justify-start gap-6 bg-[#F5F5F5] px-[18px] py-5">
           <div className="flex flex-col items-start justify-start gap-5">
             <Link
               href={`/profile/${answer.drep_id}`}
