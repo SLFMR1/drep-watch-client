@@ -516,48 +516,11 @@ export const buildSubmitConwayTx = async (
       try {
         console.log(`[${wallet._walletName}] Attempting coin selection strategy ${strategy.id} (${strategy.name})...`);
         
-        // For Typhon, we need to ensure we select UTxOs that can cover the minimum UTxO requirement
-        // when tokens are present
-        if (wallet._walletName.toLowerCase().includes('typhon')) {
-          console.log(`[${wallet._walletName}] Using Typhon-specific coin selection approach...`);
-          // Find UTxOs that can cover the minimum UTxO requirement
-          const selectedUtxos = CSL.TransactionUnspentOutputs.new();
-          let totalSelected = CSL.BigNum.from_str("0");
-          const minRequired = CSL.BigNum.from_str("5000000"); // 5 ADA minimum
-          
-          // Sort UTxOs by amount in descending order
-          const sortedUtxos = [...allUtxosFromWallet].sort((a, b) => {
-            const amountA = a.output().amount().coin();
-            const amountB = b.output().amount().coin();
-            return amountB.compare(amountA);
-          });
-          
-          // Select UTxOs until we have enough to cover the fee and minimum UTxO
-          for (const utxo of sortedUtxos) {
-            const amount = utxo.output().amount().coin();
-            selectedUtxos.add(utxo);
-            totalSelected = totalSelected.checked_add(amount);
-            
-            // If we have enough to cover the fee and minimum UTxO, stop
-            if (totalSelected.compare(minRequired) > 0) {
-              break;
-            }
-          }
-          
-          if (totalSelected.compare(minRequired) <= 0) {
-            throw new Error("No UTxOs found with sufficient ADA to cover minimum UTxO requirement");
-          }
-          
-          console.log(`[${wallet._walletName}] Selected ${selectedUtxos.len()} UTxOs with total of ${totalSelected.to_str()} lovelace for Typhon`);
-          
-          const changeConfig = CSL.ChangeConfig.new(shelleyChangeAddress);
-          txBuilder.add_inputs_from_and_change(selectedUtxos, strategy.id, changeConfig);
-        } else {
-          // Original behavior for other wallets
-          console.log(`[${wallet._walletName}] Using standard coin selection approach...`);
-          const changeConfig = CSL.ChangeConfig.new(shelleyChangeAddress);
-          txBuilder.add_inputs_from_and_change(txUnspentOutputs, strategy.id, changeConfig);
-        }
+        // REMOVED Typhon-specific pre-selection. All wallets will now use the standard approach.
+        console.log(`[${wallet._walletName}] Using standard CSL coin selection approach with all wallet UTxOs...`);
+        const changeConfig = CSL.ChangeConfig.new(shelleyChangeAddress);
+        // txUnspentOutputs contains ALL UTxOs from the wallet for every wallet now.
+        txBuilder.add_inputs_from_and_change(txUnspentOutputs, strategy.id, changeConfig);
         
         console.log(`[${wallet._walletName}] Successfully used coin selection strategy ${strategy.id}`);
         
