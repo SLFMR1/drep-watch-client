@@ -22,7 +22,7 @@ const Metatags: React.FC = (): React.ReactNode => {
       <meta name="twitter:description" content="Track and learn about Cardano dReps, their activity, and Q&A sessions." />
       <meta
         name="twitter:image"
-        content="https://www.drep.watch/assets/og-image.jpg"
+        content="https://c-ipfs-gw.nmkr.io/ipfs/QmNWssukxYXoo2MHTu6BG9ScQpbYjDYjAm8qQsgRcWjpjd"
       />
 
       {/* <!-- Meta Tags Generated via https://www.opengraph.xyz --></meta> */}
