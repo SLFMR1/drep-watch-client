@@ -356,7 +356,7 @@ const getUtxos = async (name: string): Promise<CSL.TransactionUnspentOutput[]> =
       );
       UtxosToProcess.push(utxo);
     }
-    console.log(`Processed ${UtxosToProcess.length} UTxOs from wallet.`);
+    console.log(`[${name}] Processed ${UtxosToProcess.length} fresh UTxOs from wallet.`);
     return UtxosToProcess;
   } catch (err) {
     console.error("Error in getUtxos:", err);
@@ -486,7 +486,7 @@ export const buildSubmitConwayTx = async (
     const shelleyChangeAddress = CSL.Address.from_bech32(changeAddress);
 
     // Fetch all UTxOs from the wallet
-    console.log(`[${new Date().toISOString()}] Fetching UTXOs from wallet: ${wallet._walletName}...`);
+    console.log(`[${new Date().toISOString()}] Fetching fresh UTXOs for ${wallet._walletName}...`);
     const allUtxosFromWallet = await getUtxos(wallet._walletName);
     if (allUtxosFromWallet.length === 0) {
       throw new Error("No UTxOs available in the wallet to build the transaction.");
@@ -612,16 +612,18 @@ const submitConwayTx = async (
       console.log(`[${new Date().toISOString()}] [Typhon] Attempting to submit transaction (using original build with Typhon UTXO strategy).`);
       try {
         // Log the full transaction details of the original signedTx that will be submitted
-        console.log(`[${new Date().toISOString()}] [Typhon] Original transaction details for submission:`, {
+        console.log(`[${new Date().toISOString()}] [Typhon] Submitting transaction with txHex (first 100 chars): ${txHex.substring(0, 100)}...`);
+        console.log(`[${new Date().toISOString()}] [Typhon] Full transaction details:`, {
           txHexLength: txHex.length,
           bodyHexLength: signedTx.body().to_hex().length,
           witnessSetHexLength: signedTx.witness_set().to_hex().length,
-          size: txBytes.length, // txBytes is signedTx.to_bytes() from L653
+          size: txBytes.length,
           inputs: signedTx.body().inputs().len(),
           outputs: signedTx.body().outputs().len(),
           fee: signedTx.body().fee().to_str(),
           ttl: signedTx.body().ttl(),
-          validityStartInterval: signedTx.body().validity_start_interval()
+          validityStartInterval: signedTx.body().validity_start_interval(),
+          certs: signedTx.body().certs()?.to_json() || "none",
         });
 
         console.log(`[${new Date().toISOString()}] [Typhon] Submitting original transaction...`);
@@ -631,10 +633,15 @@ const submitConwayTx = async (
         console.log(`[${new Date().toISOString()}] [Typhon] Successfully submitted original transaction in ${submitDuration}ms:`, result);
         return txHex;
       } catch (submissionError) {
-        // The type assertion helps access potential 'code' and 'info' properties if Typhon returns structured errors.
         const error = submissionError as TransactionError;
-        const errorMessage = error.message || (error.info ? `Info: ${error.info} (Code: ${error.code})` : String(submissionError));
-        console.error(`[${new Date().toISOString()}] [Typhon] Error submitting transaction: ${errorMessage}`, submissionError);
+        console.error(`[${new Date().toISOString()}] [Typhon] Detailed error submitting transaction:`, {
+          error,
+          code: error.code,
+          info: error.info,
+          message: error.message,
+          stack: error.stack,
+          txHexSample: txHex.substring(0, 200),
+        });
         // Re-throw the error; it will be caught by the main try-catch of the submitConwayTx function,
         // which already has logic to format it into a user-friendly message.
         throw submissionError;
