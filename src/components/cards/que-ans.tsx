@@ -203,6 +203,13 @@ const QueAnsCard: React.FC<QueAnsCardProps> = ({
             </>
           )}
         </div>
+        {!large && question?.question_description && (
+          <div className="mt-2 font-inter text-xs font-normal tracking-wide text-gray-500 md:text-sm">
+            {question.question_description.length < 80
+              ? question.question_description
+              : `${question.question_description.slice(0, 80)}...`}
+          </div>
+        )}
         {large && (
           <div className="font-inter text-xs font-light tracking-wide text-secondary md:text-base">
             {question?.question_description}
