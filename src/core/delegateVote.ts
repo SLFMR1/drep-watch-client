@@ -13,6 +13,11 @@ const fetchProtocolParametersFromServer = async () => {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       console.log(`Fetching protocol parameters (attempt ${attempt}/${maxRetries})...`);
+      
+      // Add timestamp for request start
+      const requestStartTime = Date.now();
+      console.log(`[${new Date().toISOString()}] Protocol parameters request started`);
+      
       const response = await fetch("/api/v1/network/protocol-parameters", {
         // Add timeout and cache control
         signal: AbortSignal.timeout(20000), // 20 second timeout
@@ -22,21 +27,47 @@ const fetchProtocolParametersFromServer = async () => {
         }
       });
 
+      // Calculate and log response time
+      const responseTime = Date.now() - requestStartTime;
+      console.log(`[${new Date().toISOString()}] Protocol parameters response received in ${responseTime}ms with status ${response.status}`);
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: response.statusText }));
-        console.error(`API Error (${response.status}):`, errorData);
+        // Enhanced error logging with response details
+        try {
+          const errorText = await response.text();
+          let errorData;
+          try {
+            errorData = JSON.parse(errorText);
+            console.error(`API Error (${response.status}):`, errorData);
+          } catch (e) {
+            console.error(`API Error (${response.status}): Non-JSON response:`, errorText.substring(0, 200));
+          }
+        } catch (readError) {
+          console.error(`API Error (${response.status}): Failed to read error response`, readError);
+        }
         
         // If we get a 504 or 500, it might be a temporary server issue
         if (response.status === 504 || response.status === 500) {
-          throw new Error(`Server temporarily unavailable (${response.status}): ${errorData.message || "Unknown error"}`);
+          throw new Error(`Server temporarily unavailable (${response.status}): Response time: ${responseTime}ms`);
         }
         
         throw new Error(
-          `Failed to fetch protocol parameters from server: ${response.status} ${errorData.message || "Unknown error"}`,
+          `Failed to fetch protocol parameters from server: ${response.status}. Response time: ${responseTime}ms`,
         );
       }
 
-      const params = await response.json();
+      // Sample the beginning of the response for debugging
+      const responseText = await response.text();
+      console.log(`Protocol parameters raw response (first 200 chars): ${responseText.substring(0, 200)}${responseText.length > 200 ? '...' : ''}`);
+      
+      let params;
+      try {
+        params = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error("Failed to parse protocol parameters response as JSON:", parseError);
+        throw new Error(`Invalid JSON in protocol parameters response`);
+      }
+
       if (!params.linearFee || !params.coinsPerUTxOByte) {
         console.error("Invalid protocol parameters received:", params);
         throw new Error("Fetched protocol parameters are missing crucial fields.");
@@ -45,7 +76,8 @@ const fetchProtocolParametersFromServer = async () => {
       console.log("Successfully fetched protocol parameters:", params);
       return params;
     } catch (error) {
-      console.warn(`Attempt ${attempt} failed:`, error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.warn(`Attempt ${attempt} failed: ${errorMessage}`);
       
       if (attempt === maxRetries) {
         // On final attempt, try to use fallback values
@@ -340,6 +372,10 @@ const toTransactionUnspentOutputs = (utxos: CSL.TransactionUnspentOutput[]): CSL
 
 const fetchCurrentSlotFromServer = async (): Promise<number> => {
   try {
+    // Add timestamp for request start
+    const requestStartTime = Date.now();
+    console.log(`[${new Date().toISOString()}] Current slot request started`);
+    
     const response = await fetch("/api/v1/network/current-slot", {
       signal: AbortSignal.timeout(20000), // 20 second timeout
       headers: {
@@ -347,19 +383,53 @@ const fetchCurrentSlotFromServer = async (): Promise<number> => {
         'Pragma': 'no-cache'
       }
     });
+    
+    // Calculate and log response time
+    const responseTime = Date.now() - requestStartTime;
+    console.log(`[${new Date().toISOString()}] Current slot response received in ${responseTime}ms with status ${response.status}`);
+    
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ message: response.statusText }));
+      // Enhanced error logging with response details
+      try {
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+          console.error(`API Error (${response.status}):`, errorData);
+        } catch (e) {
+          console.error(`API Error (${response.status}): Non-JSON response:`, errorText.substring(0, 200));
+        }
+      } catch (readError) {
+        console.error(`API Error (${response.status}): Failed to read error response`, readError);
+      }
+      
       throw new Error(
-        `Failed to fetch current slot from server: ${response.status} ${errorData.message || "Unknown error"}`,
+        `Failed to fetch current slot from server: ${response.status}. Response time: ${responseTime}ms`,
       );
     }
-    const data = await response.json();
+    
+    // Sample the beginning of the response for debugging
+    const responseText = await response.text();
+    console.log(`Current slot raw response (first 200 chars): ${responseText.substring(0, 200)}${responseText.length > 200 ? '...' : ''}`);
+    
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("Failed to parse current slot response as JSON:", parseError);
+      throw new Error(`Invalid JSON in current slot response`);
+    }
+    
     if (typeof data.currentSlot !== 'number') {
+      console.error("Invalid current slot data from server:", data);
       throw new Error("Invalid current slot data from server: 'currentSlot' is not a number or missing.");
     }
+    
+    console.log(`Successfully fetched current slot: ${data.currentSlot}`);
     return data.currentSlot;
   } catch (error) {
-    console.error("Error fetching current slot from server:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("Error fetching current slot from server:", errorMessage);
     throw error;
   }
 };
@@ -377,31 +447,42 @@ export const buildSubmitConwayTx = async (
   targetDRep: string,
 ) => {
   try {
+    console.log(`[${new Date().toISOString()}] Starting transaction build process for wallet: ${wallet._walletName}, target DRep: ${targetDRep}`);
     console.log("Building transaction: simple ADA output, CSL handles token change.");
     if (!builderSuccess) {
       throw new Error("Pre-condition for building Tx failed, aborting Tx build.");
     }
 
     // Fetch protocol parameters
+    console.log(`[${new Date().toISOString()}] Fetching protocol parameters...`);
     const protocolParams = await fetchProtocolParametersFromServer();
+    console.log(`[${new Date().toISOString()}] Protocol parameters fetched successfully, initializing transaction builder...`);
     const txBuilder = await initTransactionBuilder();
+    
+    console.log(`[${new Date().toISOString()}] Fetching current slot...`);
     const currentSlot = await fetchCurrentSlotFromServer();
 
     if (currentSlot !== undefined) {
+      console.log(`[${new Date().toISOString()}] Setting transaction validity window: start=${currentSlot}, ttl=${currentSlot + 3600 * 2}`);
       txBuilder.set_validity_start_interval(currentSlot);
       txBuilder.set_ttl(currentSlot + 3600 * 2);
     } else {
       throw new Error("Failed to set TTL, current slot undefined.");
     }
 
+    console.log(`[${new Date().toISOString()}] Building vote delegation certificate...`);
     const certBuilder = await buildVoteDelegationCert(wallet, targetDRep);
     if (!certBuilder) throw new Error("Failed to build vote delegation certificate");
+    console.log(`[${new Date().toISOString()}] Vote delegation certificate built successfully, setting certificates in transaction...`);
     txBuilder.set_certs_builder(certBuilder);
 
+    console.log(`[${new Date().toISOString()}] Getting change address...`);
     const changeAddress = await wallet.getChangeAddress();
+    console.log(`[${new Date().toISOString()}] Change address: ${changeAddress}`);
     const shelleyChangeAddress = CSL.Address.from_bech32(changeAddress);
 
     // Fetch all UTxOs from the wallet
+    console.log(`[${new Date().toISOString()}] Fetching UTXOs from wallet: ${wallet._walletName}...`);
     const allUtxosFromWallet = await getUtxos(wallet._walletName);
     if (allUtxosFromWallet.length === 0) {
       throw new Error("No UTxOs available in the wallet to build the transaction.");
@@ -434,6 +515,7 @@ export const buildSubmitConwayTx = async (
         // For Typhon, we need to ensure we select UTxOs that can cover the minimum UTxO requirement
         // when tokens are present
         if (wallet._walletName.toLowerCase().includes('typhon')) {
+          console.log(`[${wallet._walletName}] Using Typhon-specific coin selection approach...`);
           // Find UTxOs that can cover the minimum UTxO requirement
           const selectedUtxos = CSL.TransactionUnspentOutputs.new();
           let totalSelected = CSL.BigNum.from_str("0");
@@ -462,10 +544,13 @@ export const buildSubmitConwayTx = async (
             throw new Error("No UTxOs found with sufficient ADA to cover minimum UTxO requirement");
           }
           
+          console.log(`[${wallet._walletName}] Selected ${selectedUtxos.len()} UTxOs with total of ${totalSelected.to_str()} lovelace for Typhon`);
+          
           const changeConfig = CSL.ChangeConfig.new(shelleyChangeAddress);
           txBuilder.add_inputs_from_and_change(selectedUtxos, strategy.id, changeConfig);
         } else {
           // Original behavior for other wallets
+          console.log(`[${wallet._walletName}] Using standard coin selection approach...`);
           const changeConfig = CSL.ChangeConfig.new(shelleyChangeAddress);
           txBuilder.add_inputs_from_and_change(txUnspentOutputs, strategy.id, changeConfig);
         }
@@ -482,7 +567,8 @@ export const buildSubmitConwayTx = async (
         
         break;
       } catch (e) {
-        console.warn(`[${wallet._walletName}] Coin selection strategy ${strategy.id} (${strategy.name}) failed:`, e);
+        const errorMessage = e instanceof Error ? e.message : String(e);
+        console.warn(`[${wallet._walletName}] Coin selection strategy ${strategy.id} (${strategy.name}) failed: ${errorMessage}`);
         lastError = e;
         if (strategy.id === 1) {
           throw new Error(
@@ -493,30 +579,42 @@ export const buildSubmitConwayTx = async (
     }
 
     // Build transaction body
+    console.log(`[${new Date().toISOString()}] Building transaction body...`);
     const txBody = txBuilder.build();
-    console.log("Transaction body built. Fee:", txBuilder.get_fee_if_set()?.to_str());
+    console.log(`[${new Date().toISOString()}] Transaction body built. Fee: ${txBuilder.get_fee_if_set()?.to_str() || "unknown"}`);
 
     // Log outputs for debugging
     const outputs = txBody.outputs();
+    console.log(`[${new Date().toISOString()}] Transaction has ${outputs.len()} outputs:`);
     for (let i = 0; i < outputs.len(); i++) {
       const output = outputs.get(i);
-      console.log(`Output ${i} value: ${output.amount().coin().to_str()} lovelace`);
+      console.log(`[${new Date().toISOString()}] Output ${i} value: ${output.amount().coin().to_str()} lovelace, address: ${output.address().to_bech32()}`);
     }
 
+    console.log(`[${new Date().toISOString()}] Preparing transaction for signing...`);
     const unsignedWitnessSet = CSL.TransactionWitnessSet.new();
     const unsignedTx = CSL.Transaction.new(txBody, unsignedWitnessSet);
     const unsignedTxCborHex = Buffer.from(unsignedTx.to_bytes()).toString("hex");
+    console.log(`[${new Date().toISOString()}] Unsigned transaction size: ${unsignedTx.to_bytes().length} bytes`);
 
-    console.log("Requesting wallet signature...");
-    const signedTxCborHex = await wallet.signTx(unsignedTxCborHex, false);
-    console.log("Signed Transaction CBOR Hex (FOR MANUAL SUBMISSION DEBUG):", signedTxCborHex);
+    console.log(`[${new Date().toISOString()}] Requesting wallet signature from ${wallet._walletName}...`);
+    try {
+      const signedTxCborHex = await wallet.signTx(unsignedTxCborHex, false);
+      console.log(`[${new Date().toISOString()}] Transaction signed successfully by ${wallet._walletName}`);
+      console.log(`[${new Date().toISOString()}] Signed Transaction CBOR Hex (first 100 chars): ${signedTxCborHex.substring(0, 100)}...`);
 
-    const signedTx = CSL.Transaction.from_bytes(new Uint8Array(Buffer.from(signedTxCborHex, "hex")));
+      const signedTx = CSL.Transaction.from_bytes(new Uint8Array(Buffer.from(signedTxCborHex, "hex")));
+      console.log(`[${new Date().toISOString()}] Signed transaction size: ${signedTx.to_bytes().length} bytes`);
 
-    return await submitConwayTx(signedTx, wallet, targetDRep);
+      return await submitConwayTx(signedTx, wallet, targetDRep);
+    } catch (signError) {
+      const errorMessage = signError instanceof Error ? signError.message : String(signError);
+      console.error(`[${new Date().toISOString()}] Error during transaction signing with ${wallet._walletName}: ${errorMessage}`);
+      throw new Error(`Transaction signing failed with ${wallet._walletName}: ${errorMessage}`);
+    }
   } catch (err) {
-    console.error("App.buildSubmitConwayTx error:", err);
     const errorMessage = err instanceof Error ? err.message : String(err);
+    console.error(`[${new Date().toISOString()}] App.buildSubmitConwayTx error: ${errorMessage}`);
     throw new Error(`Delegation failed: ${errorMessage}`);
   }
 };
@@ -527,24 +625,30 @@ const submitConwayTx = async (
   targetDRep?: string,
 ) => {
   try {
+    console.log(`[${new Date().toISOString()}] Preparing to submit transaction with wallet: ${wallet._walletName}`);
     const txBytes = signedTx.to_bytes();
     const txHex = Buffer.from(txBytes).toString("hex");
 
-    console.log("Transaction details before submission:", {
+    console.log(`[${new Date().toISOString()}] Transaction details before submission:`, {
       size: txBytes.length,
-      body: signedTx.body().to_hex(),
-      witnessSet: signedTx.witness_set().to_hex(),
+      bodySize: signedTx.body().to_bytes().length,
+      witnessSetSize: signedTx.witness_set().to_bytes().length,
+      inputs: signedTx.body().inputs().len(),
+      outputs: signedTx.body().outputs().len(),
+      fee: signedTx.body().fee().to_str(),
+      ttl: signedTx.body().ttl(),
+      validityStart: signedTx.body().validity_start_interval()
     });
 
     // Special handling for Typhon
     if (wallet._walletName.toLowerCase().includes('typhon')) {
-      console.log("[Typhon] Attempting to submit transaction with special handling");
+      console.log(`[${new Date().toISOString()}] [Typhon] Attempting to submit transaction with special handling`);
       try {
         // Log the full transaction details
-        console.log("[Typhon] Full transaction details:", {
-          txHex,
-          body: signedTx.body().to_hex(),
-          witnessSet: signedTx.witness_set().to_hex(),
+        console.log(`[${new Date().toISOString()}] [Typhon] Full transaction details:`, {
+          txHexLength: txHex.length,
+          bodyHexLength: signedTx.body().to_hex().length,
+          witnessSetHexLength: signedTx.witness_set().to_hex().length,
           size: txBytes.length,
           inputs: signedTx.body().inputs().len(),
           outputs: signedTx.body().outputs().len(),
@@ -556,7 +660,7 @@ const submitConwayTx = async (
         // For Typhon, we need to ensure we have a proper change output
         const outputs = signedTx.body().outputs();
         if (outputs.len() === 1 && targetDRep) {
-          console.log("[Typhon] Single output detected, attempting to add change output");
+          console.log(`[${new Date().toISOString()}] [Typhon] Single output detected, attempting to add change output`);
           const txBuilder = await initTransactionBuilder();
           const changeAddress = await wallet.getChangeAddress();
           const shelleyChangeAddress = CSL.Address.from_bech32(changeAddress);
@@ -578,38 +682,56 @@ const submitConwayTx = async (
           const newUnsignedTx = CSL.Transaction.new(newTxBody, newUnsignedWitnessSet);
           const newUnsignedTxCborHex = Buffer.from(newUnsignedTx.to_bytes()).toString("hex");
           
-          console.log("[Typhon] Requesting signature for rebuilt transaction");
+          console.log(`[${new Date().toISOString()}] [Typhon] Requesting signature for rebuilt transaction`);
           const newSignedTxCborHex = await wallet.signTx(newUnsignedTxCborHex, false);
           const newSignedTx = CSL.Transaction.from_bytes(new Uint8Array(Buffer.from(newSignedTxCborHex, "hex")));
           
+          console.log(`[${new Date().toISOString()}] [Typhon] New transaction details:`, {
+            size: newSignedTx.to_bytes().length,
+            inputs: newSignedTx.body().inputs().len(),
+            outputs: newSignedTx.body().outputs().len(),
+            fee: newSignedTx.body().fee().to_str()
+          });
+          
           // Submit the new transaction
+          console.log(`[${new Date().toISOString()}] [Typhon] Submitting rebuilt transaction...`);
+          const submitStartTime = Date.now();
           const result = await wallet.submitTx(Buffer.from(newSignedTx.to_bytes()).toString("hex"));
-          console.log("[Typhon] Successfully submitted rebuilt transaction:", result);
+          const submitDuration = Date.now() - submitStartTime;
+          console.log(`[${new Date().toISOString()}] [Typhon] Successfully submitted rebuilt transaction in ${submitDuration}ms:`, result);
           return Buffer.from(newSignedTx.to_bytes()).toString("hex");
         }
 
         // If we already have multiple outputs, try submitting as is
         try {
+          console.log(`[${new Date().toISOString()}] [Typhon] Submitting original transaction...`);
+          const submitStartTime = Date.now();
           const result = await wallet.submitTx(txHex);
-          console.log("[Typhon] Successfully submitted original transaction:", result);
+          const submitDuration = Date.now() - submitStartTime;
+          console.log(`[${new Date().toISOString()}] [Typhon] Successfully submitted original transaction in ${submitDuration}ms:`, result);
           return txHex;
         } catch (rawTxError) {
-          console.warn("[Typhon] Raw transaction submission failed:", rawTxError);
+          const errorMessage = rawTxError instanceof Error ? rawTxError.message : String(rawTxError);
+          console.warn(`[${new Date().toISOString()}] [Typhon] Raw transaction submission failed: ${errorMessage}`);
           throw rawTxError;
         }
       } catch (typhonError) {
-        console.error("[Typhon] Error with special submission:", typhonError);
+        const errorMessage = typhonError instanceof Error ? typhonError.message : String(typhonError);
+        console.error(`[${new Date().toISOString()}] [Typhon] Error with special submission: ${errorMessage}`);
         throw typhonError;
       }
     }
 
     // Normal submission for all wallets
+    console.log(`[${new Date().toISOString()}] Submitting transaction using ${wallet._walletName}...`);
+    const submitStartTime = Date.now();
     const result = await wallet.submitTx(txHex);
-    console.log("Submitted transaction hash", result);
+    const submitDuration = Date.now() - submitStartTime;
+    console.log(`[${new Date().toISOString()}] Transaction submitted successfully in ${submitDuration}ms, hash: ${result}`);
     return txHex;
   } catch (err) {
     const txError = err as TransactionError;
-    console.error("Error during submission of transaction:", {
+    console.error(`[${new Date().toISOString()}] Error during submission of transaction:`, {
       error: err,
       code: txError.code,
       info: txError.info,
