@@ -400,15 +400,20 @@ export const buildSubmitConwayTx = async (
     if (allUtxosFromWallet.length === 0) {
       throw new Error("No UTxOs available in the wallet to build the transaction.");
     }
+    
+    // Add detailed UTxO logging
+    console.log(`[${wallet._walletName}] Processing ${allUtxosFromWallet.length} UTxOs`);
+    let totalLovelace = CSL.BigNum.from_str("0");
+    for (const utxo of allUtxosFromWallet) {
+      const amount = utxo.output().amount().coin();
+      totalLovelace = totalLovelace.checked_add(amount);
+      console.log(`[${wallet._walletName}] UTxO amount: ${amount.to_str()} lovelace`);
+    }
+    console.log(`[${wallet._walletName}] Total available lovelace: ${totalLovelace.to_str()}`);
+
     const txUnspentOutputs = toTransactionUnspentOutputs(allUtxosFromWallet);
 
-    // Calculate total available ADA
-    let totalInputAda = CSL.BigNum.from_str("0");
-    for (const utxo of allUtxosFromWallet) {
-      totalInputAda = totalInputAda.checked_add(utxo.output().amount().coin());
-    }
-
-    // Let CSL handle input selection without automatic change output
+    // Let CSL handle input selection and change output automatically
     const strategies = [
       { id: 3, name: "largest first" },
       { id: 2, name: "random improve" },
@@ -418,12 +423,60 @@ export const buildSubmitConwayTx = async (
     let lastError = null;
     for (const strategy of strategies) {
       try {
-        console.log(`Attempting coin selection strategy ${strategy.id} (${strategy.name})...`);
-        txBuilder.add_inputs_from(txUnspentOutputs, strategy.id);
-        console.log(`Successfully used coin selection strategy ${strategy.id}`);
+        console.log(`[${wallet._walletName}] Attempting coin selection strategy ${strategy.id} (${strategy.name})...`);
+        
+        // For Typhon, we need to ensure we select UTxOs that can cover the minimum UTxO requirement
+        // when tokens are present
+        if (wallet._walletName.toLowerCase().includes('typhon')) {
+          // Find UTxOs that can cover the minimum UTxO requirement
+          const selectedUtxos = CSL.TransactionUnspentOutputs.new();
+          let totalSelected = CSL.BigNum.from_str("0");
+          const minRequired = CSL.BigNum.from_str("5000000"); // 5 ADA minimum
+          
+          // Sort UTxOs by amount in descending order
+          const sortedUtxos = [...allUtxosFromWallet].sort((a, b) => {
+            const amountA = a.output().amount().coin();
+            const amountB = b.output().amount().coin();
+            return amountB.compare(amountA);
+          });
+          
+          // Select UTxOs until we have enough to cover the fee and minimum UTxO
+          for (const utxo of sortedUtxos) {
+            const amount = utxo.output().amount().coin();
+            selectedUtxos.add(utxo);
+            totalSelected = totalSelected.checked_add(amount);
+            
+            // If we have enough to cover the fee and minimum UTxO, stop
+            if (totalSelected.compare(minRequired) > 0) {
+              break;
+            }
+          }
+          
+          if (totalSelected.compare(minRequired) <= 0) {
+            throw new Error("No UTxOs found with sufficient ADA to cover minimum UTxO requirement");
+          }
+          
+          const changeConfig = CSL.ChangeConfig.new(shelleyChangeAddress);
+          txBuilder.add_inputs_from_and_change(selectedUtxos, strategy.id, changeConfig);
+        } else {
+          // Original behavior for other wallets
+          const changeConfig = CSL.ChangeConfig.new(shelleyChangeAddress);
+          txBuilder.add_inputs_from_and_change(txUnspentOutputs, strategy.id, changeConfig);
+        }
+        
+        console.log(`[${wallet._walletName}] Successfully used coin selection strategy ${strategy.id}`);
+        
+        // Log transaction details after input selection
+        const selectedInputs = txBuilder.get_explicit_input();
+        console.log(`[${wallet._walletName}] Selected inputs total: ${selectedInputs.coin().to_str()} lovelace`);
+        
+        // Log fee estimation
+        const estimatedFee = txBuilder.min_fee();
+        console.log(`[${wallet._walletName}] Estimated fee: ${estimatedFee.to_str()} lovelace`);
+        
         break;
       } catch (e) {
-        console.warn(`Coin selection strategy ${strategy.id} (${strategy.name}) failed:`, e);
+        console.warn(`[${wallet._walletName}] Coin selection strategy ${strategy.id} (${strategy.name}) failed:`, e);
         lastError = e;
         if (strategy.id === 1) {
           throw new Error(
@@ -431,46 +484,6 @@ export const buildSubmitConwayTx = async (
           );
         }
       }
-    }
-
-    // Calculate total input value (ADA and tokens)
-    let totalInputValue = CSL.Value.new(CSL.BigNum.from_str("0"));
-    const selectedInputs = txBuilder.get_explicit_input();
-    totalInputValue = totalInputValue.checked_add(selectedInputs);
-
-    // Estimate fee
-    const fee = txBuilder.min_fee();
-    console.log(`Initial estimated fee: ${fee.to_str()} lovelace`);
-    
-    // Add a buffer to the fee to ensure it's sufficient
-    const feeBuffer = CSL.BigNum.from_str("500000"); // 0.5 ADA buffer
-    const adjustedFee = fee.checked_add(feeBuffer);
-    console.log(`Adjusted fee with buffer: ${adjustedFee.to_str()} lovelace`);
-    
-    // Set the adjusted fee
-    txBuilder.set_fee(adjustedFee);
-
-    // From the error, we know the minimum UTxO was 2,116,210 lovelace for an output with tokens
-    const minUtxoLovelace = CSL.BigNum.from_str("2500000"); // Increased minimum UTxO size for safety
-
-    // Create change output manually
-    const changeValue = totalInputValue.checked_sub(CSL.Value.new(adjustedFee));
-    if (changeValue.coin().less_than(minUtxoLovelace)) {
-      console.log(
-        `Change output has ${changeValue.coin().to_str()} lovelace, but requires at least ${minUtxoLovelace.to_str()} lovelace. Adjusting...`,
-      );
-      // Adjust change value to meet minimum UTxO
-      changeValue.set_coin(minUtxoLovelace);
-    }
-    const changeOutput = CSL.TransactionOutput.new(shelleyChangeAddress, changeValue);
-    txBuilder.add_output(changeOutput);
-
-    // Check if wallet has enough ADA
-    const totalRequiredAda = adjustedFee.checked_add(minUtxoLovelace);
-    if (totalInputAda.less_than(totalRequiredAda)) {
-      throw new Error(
-        `Insufficient ADA in wallet. Available: ${totalInputAda.to_str()} lovelace, Required: ${totalRequiredAda.to_str()} lovelace. Please add more funds to your wallet.`,
-      );
     }
 
     // Build transaction body
@@ -494,7 +507,7 @@ export const buildSubmitConwayTx = async (
 
     const signedTx = CSL.Transaction.from_bytes(new Uint8Array(Buffer.from(signedTxCborHex, "hex")));
 
-    return await submitConwayTx(signedTx, wallet);
+    return await submitConwayTx(signedTx, wallet, targetDRep);
   } catch (err) {
     console.error("App.buildSubmitConwayTx error:", err);
     const errorMessage = err instanceof Error ? err.message : String(err);
@@ -505,6 +518,7 @@ export const buildSubmitConwayTx = async (
 const submitConwayTx = async (
   signedTx: CSL.Transaction,
   wallet: BrowserWallet,
+  targetDRep?: string,
 ) => {
   try {
     const txBytes = signedTx.to_bytes();
@@ -516,6 +530,74 @@ const submitConwayTx = async (
       witnessSet: signedTx.witness_set().to_hex(),
     });
 
+    // Special handling for Typhon
+    if (wallet._walletName.toLowerCase().includes('typhon')) {
+      console.log("[Typhon] Attempting to submit transaction with special handling");
+      try {
+        // Log the full transaction details
+        console.log("[Typhon] Full transaction details:", {
+          txHex,
+          body: signedTx.body().to_hex(),
+          witnessSet: signedTx.witness_set().to_hex(),
+          size: txBytes.length,
+          inputs: signedTx.body().inputs().len(),
+          outputs: signedTx.body().outputs().len(),
+          fee: signedTx.body().fee().to_str(),
+          ttl: signedTx.body().ttl(),
+          validityStartInterval: signedTx.body().validity_start_interval()
+        });
+
+        // For Typhon, we need to ensure we have a proper change output
+        const outputs = signedTx.body().outputs();
+        if (outputs.len() === 1 && targetDRep) {
+          console.log("[Typhon] Single output detected, attempting to add change output");
+          const txBuilder = await initTransactionBuilder();
+          const changeAddress = await wallet.getChangeAddress();
+          const shelleyChangeAddress = CSL.Address.from_bech32(changeAddress);
+          
+          // Rebuild the transaction with proper change output
+          const certBuilder = await buildVoteDelegationCert(wallet, targetDRep);
+          if (!certBuilder) throw new Error("Failed to build vote delegation certificate");
+          txBuilder.set_certs_builder(certBuilder);
+          
+          // Use the same UTxO selection strategy
+          const allUtxosFromWallet = await getUtxos(wallet._walletName);
+          const txUnspentOutputs = toTransactionUnspentOutputs(allUtxosFromWallet);
+          const changeConfig = CSL.ChangeConfig.new(shelleyChangeAddress);
+          txBuilder.add_inputs_from_and_change(txUnspentOutputs, 3, changeConfig);
+          
+          // Build and sign the new transaction
+          const newTxBody = txBuilder.build();
+          const newUnsignedWitnessSet = CSL.TransactionWitnessSet.new();
+          const newUnsignedTx = CSL.Transaction.new(newTxBody, newUnsignedWitnessSet);
+          const newUnsignedTxCborHex = Buffer.from(newUnsignedTx.to_bytes()).toString("hex");
+          
+          console.log("[Typhon] Requesting signature for rebuilt transaction");
+          const newSignedTxCborHex = await wallet.signTx(newUnsignedTxCborHex, false);
+          const newSignedTx = CSL.Transaction.from_bytes(new Uint8Array(Buffer.from(newSignedTxCborHex, "hex")));
+          
+          // Submit the new transaction
+          const result = await wallet.submitTx(Buffer.from(newSignedTx.to_bytes()).toString("hex"));
+          console.log("[Typhon] Successfully submitted rebuilt transaction:", result);
+          return Buffer.from(newSignedTx.to_bytes()).toString("hex");
+        }
+
+        // If we already have multiple outputs, try submitting as is
+        try {
+          const result = await wallet.submitTx(txHex);
+          console.log("[Typhon] Successfully submitted original transaction:", result);
+          return txHex;
+        } catch (rawTxError) {
+          console.warn("[Typhon] Raw transaction submission failed:", rawTxError);
+          throw rawTxError;
+        }
+      } catch (typhonError) {
+        console.error("[Typhon] Error with special submission:", typhonError);
+        throw typhonError;
+      }
+    }
+
+    // Normal submission for all wallets
     const result = await wallet.submitTx(txHex);
     console.log("Submitted transaction hash", result);
     return txHex;
