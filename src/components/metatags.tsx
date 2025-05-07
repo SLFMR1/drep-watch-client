@@ -3,26 +3,26 @@ import Head from "next/head";
 const Metatags: React.FC = (): React.ReactNode => {
   return (
     <Head>
-      <title>dRepWatch</title>
-      <meta name="description" content="" />
+      <title>dRepWatch – Cardano dRep Insights</title>
+      <meta name="description" content="Track and learn about Cardano dReps, their activity, and Q&A sessions." />
 
-      <meta property="og:url" content="https://drep-client.vercel.app/" />
+      <meta property="og:url" content="https://www.drep.watch" />
       <meta property="og:type" content="website" />
-      <meta property="og:title" content="dRepWatch" />
-      <meta property="og:description" content="" />
+      <meta property="og:title" content="dRepWatch – Cardano dRep Insights" />
+      <meta property="og:description" content="Track and learn about Cardano dReps, their activity, and Q&A sessions." />
       <meta
         property="og:image"
-        content="https://gmrguksafuopppgoodxy.supabase.co/storage/v1/object/public/nucast-assests/drep-opengraph.png"
+        content="https://c-ipfs-gw.nmkr.io/ipfs/QmNWssukxYXoo2MHTu6BG9ScQpbYjDYjAm8qQsgRcWjpjd"
       />
 
       <meta name="twitter:card" content="summary_large_image" />
-      <meta property="twitter:domain" content="drep-client.vercel.app" />
-      <meta property="twitter:url" content="https://drep-client.vercel.app/" />
-      <meta name="twitter:title" content="dRepWatch" />
-      <meta name="twitter:description" content="" />
+      <meta property="twitter:domain" content="drep.watch" />
+      <meta property="twitter:url" content="https://www.drep.watch" />
+      <meta name="twitter:title" content="dRepWatch – Cardano dRep Insights" />
+      <meta name="twitter:description" content="Track and learn about Cardano dReps, their activity, and Q&A sessions." />
       <meta
         name="twitter:image"
-        content="https://gmrguksafuopppgoodxy.supabase.co/storage/v1/object/public/nucast-assests/drep-opengraph.png"
+        content="https://www.drep.watch/assets/og-image.jpg"
       />
 
       {/* <!-- Meta Tags Generated via https://www.opengraph.xyz --></meta> */}
