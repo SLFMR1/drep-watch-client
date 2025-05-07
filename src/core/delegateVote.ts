@@ -1,4 +1,5 @@
 import * as CSL from "@emurgo/cardano-serialization-lib-asmjs";
+import { BASE_API_URL } from "../data/api"; // Import the BASE_API_URL
 
 // For debugging the entire CSL import:
 console.log("Entire CSL module object:", CSL);
@@ -13,14 +14,15 @@ const fetchProtocolParametersFromServer = async () => {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       console.log(`Fetching protocol parameters (attempt ${attempt}/${maxRetries})...`);
+      console.log(`Using API URL: ${BASE_API_URL}/api/v1/network/protocol-parameters`);
       
       // Add timestamp for request start
       const requestStartTime = Date.now();
       console.log(`[${new Date().toISOString()}] Protocol parameters request started`);
       
-      const response = await fetch("/api/v1/network/protocol-parameters", {
+      const response = await fetch(`${BASE_API_URL}/api/v1/network/protocol-parameters`, {
         // Add timeout and cache control
-        signal: AbortSignal.timeout(20000), // 20 second timeout
+        signal: AbortSignal.timeout(30000), 
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
@@ -372,12 +374,14 @@ const toTransactionUnspentOutputs = (utxos: CSL.TransactionUnspentOutput[]): CSL
 
 const fetchCurrentSlotFromServer = async (): Promise<number> => {
   try {
+    console.log(`Using API URL: ${BASE_API_URL}/api/v1/network/current-slot`);
+    
     // Add timestamp for request start
     const requestStartTime = Date.now();
     console.log(`[${new Date().toISOString()}] Current slot request started`);
     
-    const response = await fetch("/api/v1/network/current-slot", {
-      signal: AbortSignal.timeout(20000), // 20 second timeout
+    const response = await fetch(`${BASE_API_URL}/api/v1/network/current-slot`, {
+      signal: AbortSignal.timeout(30000), // Increased to 30 second timeout for production
       headers: {
         'Cache-Control': 'no-cache',
         'Pragma': 'no-cache'
