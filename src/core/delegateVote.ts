@@ -1,61 +1,59 @@
-import {
-  Address,
-  TransactionUnspentOutput,
-  TransactionUnspentOutputs,
-  TransactionOutput,
-  Value,
-  TransactionBuilder,
-  TransactionBuilderConfigBuilder,
-  LinearFee,
-  BigNum,
-  TransactionWitnessSet,
-  Transaction as CTransaction,
-  Credential,
-  Certificate,
-  Ed25519KeyHash,
-  CertificatesBuilder,
-  VoteDelegation,
-  DRep,
-  UnitInterval,
-  ChangeConfig,
-  ExUnitPrices,
-} from "@emurgo/cardano-serialization-lib-asmjs";
-import { BrowserWallet, resolveStakeKeyHash, Wallet } from "@meshsdk/core";
+import * as CSL from "@emurgo/cardano-serialization-lib-asmjs";
 
-const protocolParams = {
-  linearFee: {
-    minFeeA: "44",
-    minFeeB: "155381",
-  },
-  minUtxo: "1000000",
-  poolDeposit: "500000000",
-  keyDeposit: "2000000",
-  maxValSize: 5000,
-  maxTxSize: 16384,
-  priceMem: 0.0577,
-  priceStep: 0.0000721,
-  coinsPerUTxOByte: "4310",
+// For debugging the entire CSL import:
+console.log("Entire CSL module object:", CSL);
+
+import { BrowserWallet, resolveStakeKeyHash } from "@meshsdk/core";
+import { convertDRepIdToCIP129 } from "../utils/drepUtils";
+
+const fetchProtocolParametersFromServer = async () => {
+  try {
+    const response = await fetch("/api/v1/network/protocol-parameters");
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: response.statusText }));
+      throw new Error(
+        `Failed to fetch protocol parameters from server: ${response.status} ${errorData.message || "Unknown error"}`,
+      );
+    }
+    const params = await response.json();
+    if (!params.linearFee || !params.coinsPerUTxOByte) {
+      throw new Error("Fetched protocol parameters are missing crucial fields.");
+    }
+    console.log("Fetched protocol parameters from server:", params);
+    return params;
+  } catch (error) {
+    console.error("Error fetching protocol parameters from server:", error);
+    throw error;
+  }
 };
 
 const initTransactionBuilder = async () => {
-  const txBuilder = TransactionBuilder.new(
-    TransactionBuilderConfigBuilder.new()
+  const currentProtocolParams = await fetchProtocolParametersFromServer();
+
+  const txBuilder = CSL.TransactionBuilder.new(
+    CSL.TransactionBuilderConfigBuilder.new()
       .fee_algo(
-        LinearFee.new(
-          BigNum.from_str(protocolParams.linearFee.minFeeA),
-          BigNum.from_str(protocolParams.linearFee.minFeeB),
+        CSL.LinearFee.new(
+          CSL.BigNum.from_str(currentProtocolParams.linearFee.minFeeA),
+          CSL.BigNum.from_str(currentProtocolParams.linearFee.minFeeB),
         ),
       )
-      .pool_deposit(BigNum.from_str(protocolParams.poolDeposit))
-      .key_deposit(BigNum.from_str(protocolParams.keyDeposit))
-      .coins_per_utxo_byte(BigNum.from_str(protocolParams.coinsPerUTxOByte))
-      .max_value_size(protocolParams.maxValSize)
-      .max_tx_size(protocolParams.maxTxSize)
+      .pool_deposit(CSL.BigNum.from_str(currentProtocolParams.poolDeposit))
+      .key_deposit(CSL.BigNum.from_str(currentProtocolParams.keyDeposit))
+      .coins_per_utxo_byte(CSL.BigNum.from_str(currentProtocolParams.coinsPerUTxOByte))
+      .max_value_size(currentProtocolParams.maxValSize)
+      .max_tx_size(currentProtocolParams.maxTxSize)
       .prefer_pure_change(true)
       .ex_unit_prices(
-        ExUnitPrices.new(
-          UnitInterval.new(BigNum.from_str("577"), BigNum.from_str("10000")),
-          UnitInterval.new(BigNum.from_str("721"), BigNum.from_str("10000000")),
+        CSL.ExUnitPrices.new(
+          CSL.UnitInterval.new(
+            CSL.BigNum.from_str(String(Math.round(currentProtocolParams.priceMem * 10000))),
+            CSL.BigNum.from_str("10000"),
+          ),
+          CSL.UnitInterval.new(
+            CSL.BigNum.from_str(String(Math.round(currentProtocolParams.priceStep * 10000000))),
+            CSL.BigNum.from_str("10000000"),
+          ),
         ),
       )
       .build(),
@@ -75,125 +73,249 @@ const buildVoteDelegationCert = async (
       resolveStakeKeyHash(stakekey ?? ""),
     );
 
-    let targetDRep;
-    if (voteDelegationTarget.toUpperCase() === "ABSTAIN") {
-      targetDRep = DRep.new_always_abstain();
-    } else if (voteDelegationTarget.toUpperCase() === "NO CONFIDENCE") {
-      targetDRep = DRep.new_always_no_confidence();
+    let targetDRep: CSL.DRep | undefined;
+    const upperVoteDelegationTarget = voteDelegationTarget.toUpperCase();
+
+    if (upperVoteDelegationTarget === "ABSTAIN") {
+      targetDRep = CSL.DRep.new_always_abstain();
+    } else if (upperVoteDelegationTarget === "NO CONFIDENCE") {
+      targetDRep = CSL.DRep.new_always_no_confidence();
     } else {
-      const dRepKeyCred = await handleInputToCredential(voteDelegationTarget);
+      let dRepIdToParse = voteDelegationTarget;
+      try {
+        const parsedDRep = CSL.DRep.from_bech32(dRepIdToParse);
+        console.log(`Parsed DRep from bech32 ('${dRepIdToParse}'), kind:`, parsedDRep.kind());
 
-      const dRepKeyCredHash = dRepKeyCred?.to_keyhash();
+        switch (parsedDRep.kind()) {
+          case CSL.DRepKind.KeyHash:
+            const keyHash = parsedDRep.to_key_hash();
+            if (keyHash) {
+              targetDRep = CSL.DRep.new_key_hash(keyHash);
+            } else {
+              throw new Error("Failed to extract key hash from DRep (KeyHash kind).");
+            }
+            break;
+          case CSL.DRepKind.ScriptHash:
+            const scriptHash = parsedDRep.to_script_hash();
+            if (scriptHash) {
+              targetDRep = CSL.DRep.new_script_hash(scriptHash);
+            } else {
+              throw new Error("Failed to extract script hash from DRep (ScriptHash kind).");
+            }
+            break;
+          case CSL.DRepKind.AlwaysAbstain:
+            targetDRep = CSL.DRep.new_always_abstain();
+            break;
+          case CSL.DRepKind.AlwaysNoConfidence:
+            targetDRep = CSL.DRep.new_always_no_confidence();
+            break;
+          default:
+            throw new Error(`Unsupported DRep kind from direct parse: ${parsedDRep.kind()}`);
+        }
+      } catch (initialParseError) {
+        console.warn(
+          `Initial DRep.from_bech32 parse failed for '${voteDelegationTarget}': ${initialParseError}. Attempting CIP-105 to CIP-129 conversion.`,
+        );
+        const convertedDRepId = convertDRepIdToCIP129(voteDelegationTarget);
+        if (convertedDRepId) {
+          console.log(`Successfully converted DRep ID to CIP-129: '${convertedDRepId}'`);
+          try {
+            const originalDRepForDebug = CSL.DRep.from_bech32(voteDelegationTarget);
+            if (originalDRepForDebug.kind() === CSL.DRepKind.KeyHash) {
+              const originalKeyHash = originalDRepForDebug.to_key_hash()?.to_hex();
+              const convertedDRepForDebug = CSL.DRep.from_bech32(convertedDRepId);
+              if (convertedDRepForDebug.kind() === CSL.DRepKind.KeyHash) {
+                const convertedKeyHash = convertedDRepForDebug.to_key_hash()?.to_hex();
+                console.log(`[DEBUG] Original DRep KeyHash (CIP-105 style): ${originalKeyHash}, Converted DRep KeyHash (CIP-129 style): ${convertedKeyHash}`);
+                if (originalKeyHash !== convertedKeyHash) {
+                  console.error("[CRITICAL DEBUG] KeyHash mismatch after conversion! This should not happen.");
+                }
+              } else {
+                console.log("[DEBUG] Converted DRep is not a key hash, skipping direct hash comparison for this path.");
+              }
+            } else {
+              console.log("[DEBUG] Original DRep is not a key hash, skipping direct hash comparison for this path.");
+            }
+          } catch (debugParseError) {
+            console.log("[DEBUG] Could not parse original DRep for key hash comparison:", debugParseError);
+          }
 
-      targetDRep = dRepKeyCredHash ? DRep.new_key_hash(dRepKeyCredHash) : null;
+          dRepIdToParse = convertedDRepId;
+          try {
+            const parsedConvertedDRep = CSL.DRep.from_bech32(dRepIdToParse);
+            console.log(
+              `Parsed DRep from bech32 after conversion ('${dRepIdToParse}'), kind:`,
+              parsedConvertedDRep.kind(),
+            );
+            switch (parsedConvertedDRep.kind()) {
+              case CSL.DRepKind.KeyHash:
+                const keyHash = parsedConvertedDRep.to_key_hash();
+                if (keyHash) {
+                  targetDRep = CSL.DRep.new_key_hash(keyHash);
+                } else {
+                  throw new Error("Failed to extract key hash from converted DRep (KeyHash kind).");
+                }
+                break;
+              case CSL.DRepKind.ScriptHash:
+                const scriptHash = parsedConvertedDRep.to_script_hash();
+                if (scriptHash) {
+                  targetDRep = CSL.DRep.new_script_hash(scriptHash);
+                } else {
+                  throw new Error("Failed to extract script hash from converted DRep (ScriptHash kind).");
+                }
+                break;
+              default:
+                throw new Error(
+                  `Unsupported DRep kind after conversion and parse: ${parsedConvertedDRep.kind()}`,
+                );
+            }
+          } catch (parseAfterConversionError) {
+            console.error(
+              `Error parsing DRep ID '${dRepIdToParse}' even after CIP-129 conversion:`,
+              parseAfterConversionError,
+            );
+            throw new Error(
+              `Invalid DRep ID: Failed to parse as standard bech32 or after CIP-129 conversion. Original: '${voteDelegationTarget}'. Attempted: '${dRepIdToParse}'. Error: ${parseAfterConversionError}`,
+            );
+          }
+        } else {
+          console.error(
+            `CIP-105 to CIP-129 conversion failed for '${voteDelegationTarget}'. Original parse error: ${initialParseError}`,
+          );
+          throw new Error(
+            `Invalid DRep ID: Must be 'ABSTAIN', 'NO CONFIDENCE', a valid CIP-129 DRep ID, or a convertible CIP-105 DRep ID. Original error: ${initialParseError}`,
+          );
+        }
+      }
     }
 
-    if (!stakeCred) throw Error("No Stake Cred");
-    if (!targetDRep) throw Error("No target DRep");
+    if (!stakeCred || !stakeCred.cred) {
+      console.error("Stake credential is undefined or invalid for vote delegation.");
+      throw Error("No Stake Credential provided or resolved.");
+    }
+    if (!targetDRep) {
+      console.error("Target DRep could not be determined from input:", voteDelegationTarget);
+      throw Error("No target DRep could be constructed for vote delegation.");
+    }
 
-    // Create cert object
-    const voteDelegationCert = VoteDelegation.new(stakeCred, targetDRep);
-    // add cert to certBuilder
-    certBuilder.add(Certificate.new_vote_delegation(voteDelegationCert));
+    const voteDelegationCert = CSL.VoteDelegation.new(stakeCred.cred, targetDRep);
+    console.log("Created vote delegation certificate");
+
+    certBuilder.add(CSL.Certificate.new_vote_delegation(voteDelegationCert));
+    console.log("Added certificate to builder");
 
     return certBuilder;
   } catch (err) {
-    console.log(err);
+    console.error("Error in buildVoteDelegationCert:", err);
     return null;
   }
 };
 
 const getCertBuilder = async () => {
-  const certBuilder = null;
-  if (certBuilder) {
-    return certBuilder;
-  } else {
-    return CertificatesBuilder.new();
-  }
+  return CSL.CertificatesBuilder.new();
 };
 
 const handleInputToCredential = async (input: string) => {
   try {
-    const keyHash = Ed25519KeyHash.from_hex(input);
-    const cred = Credential.from_keyhash(keyHash);
-    return cred;
-  } catch (err1) {
+    const keyHash = CSL.Ed25519KeyHash.from_hex(input);
+    const cred = CSL.Credential.from_keyhash(keyHash);
+    return { type: "keyhash", cred: cred };
+  } catch (errHex) {
     try {
-      const keyHash = Ed25519KeyHash.from_bech32(input);
-      const cred = Credential.from_keyhash(keyHash);
-      return cred;
-    } catch (err2) {
-      console.error("Error in parsing credential, not Hex or Bech32:");
-      console.error(err1, err2);
+      const drep = CSL.DRep.from_bech32(input);
+      if (drep.kind() === CSL.DRepKind.KeyHash) {
+        const keyHash = drep.to_key_hash();
+        if (!keyHash) {
+          console.error("DRep.from_bech32 parsed as KeyHash, but to_key_hash() returned undefined.");
+          return null;
+        }
+        const cred = CSL.Credential.from_keyhash(keyHash);
+        return { type: "keyhash", cred: cred };
+      } else if (drep.kind() === CSL.DRepKind.ScriptHash) {
+        const scriptHash = drep.to_script_hash();
+        if (!scriptHash) {
+          console.error("DRep.from_bech32 parsed as ScriptHash, but to_script_hash() returned undefined.");
+          return null;
+        }
+        const cred = CSL.Credential.from_scripthash(scriptHash);
+        return { type: "scripthash", cred: cred };
+      } else {
+        console.error(
+          "DRep.from_bech32 parsed a DRep type not suitable for direct credential extraction (e.g., Abstain/NoConfidence):",
+          drep.kind(),
+        );
+        return null;
+      }
+    } catch (errBech32DRep) {
+      console.error(
+        "Error parsing credential: Input was not a valid Hex Ed25519KeyHash nor a valid Bech32 DRep ID parsable by DRep.from_bech32().",
+      );
+      console.error({ errHex_details: errHex, errBech32DRep_details: errBech32DRep });
       return null;
     }
   }
 };
 
-const getUtxos = async (name: string) => {
-  let Utxos = [];
+const getUtxos = async (name: string): Promise<CSL.TransactionUnspentOutput[]> => {
+  const UtxosToProcess: CSL.TransactionUnspentOutput[] = [];
   try {
     const api = await window.cardano[name]?.enable();
     if (!api) throw new Error("Failed to enable cardano API");
     const rawUtxos = await api.getUtxos();
-    for (const rawUtxo of rawUtxos ?? []) {
-      const utxo = TransactionUnspentOutput.from_bytes(
-        Buffer.from(rawUtxo, "hex"),
-      );
-      const input = utxo.input();
-      const txid = Buffer.from(input.transaction_id().to_bytes()).toString(
-        "hex",
-      );
-      const txindx = input.index();
-      const output = utxo.output();
-      const amount = output.amount().coin().to_str(); // ADA amount in lovelace
-      const multiasset = output.amount().multiasset();
-      let multiAssetStr = "";
-      if (multiasset) {
-        const keys = multiasset.keys(); // policy Ids of the multiasset
-        const N = keys.len();
-        for (let i = 0; i < N; i++) {
-          const policyId = keys.get(i);
-          const policyIdHex = Buffer.from(policyId.to_bytes()).toString("hex");
-          const assets = multiasset.get(policyId);
-          if (!assets) continue;
-          const assetNames = assets.keys();
-          const K = assetNames.len();
 
-          for (let j = 0; j < K; j++) {
-            const assetName = assetNames.get(j);
-            const assetNameString = Buffer.from(assetName.name()).toString();
-            const assetNameHex = Buffer.from(assetName.name()).toString("hex");
-            const multiassetAmt = multiasset.get_asset(policyId, assetName);
-            multiAssetStr += `+ ${multiassetAmt.to_str()} + ${policyIdHex}.${assetNameHex} (${assetNameString})`;
-          }
-        }
-      }
-      const obj = {
-        txid: txid,
-        txindx: txindx,
-        amount: amount,
-        str: `${txid} #${txindx} = ${amount}`,
-        multiAssetStr: multiAssetStr,
-        TransactionUnspentOutput: utxo,
-      };
-      Utxos.push(obj);
+    if (!rawUtxos || rawUtxos.length === 0) {
+      console.warn("No UTxOs found in the wallet.");
+      return [];
     }
 
-    return Utxos;
+    for (const rawUtxo of rawUtxos) {
+      const utxo = CSL.TransactionUnspentOutput.from_bytes(
+        new Uint8Array(Buffer.from(rawUtxo, "hex")),
+      );
+      UtxosToProcess.push(utxo);
+    }
+    console.log(`Processed ${UtxosToProcess.length} UTxOs from wallet.`);
+    return UtxosToProcess;
   } catch (err) {
-    console.log(err);
+    console.error("Error in getUtxos:", err);
+    throw err;
   }
 };
 
-const getTxUnspentOutputs = async (name: string) => {
-  let txOutputs = TransactionUnspentOutputs.new();
-  const Utxos = await getUtxos(name);
-  for (const utxo of Utxos ?? []) {
-    txOutputs.add(utxo.TransactionUnspentOutput);
+const toTransactionUnspentOutputs = (utxos: CSL.TransactionUnspentOutput[]): CSL.TransactionUnspentOutputs => {
+  const txOutputs = CSL.TransactionUnspentOutputs.new();
+  for (const utxo of utxos) {
+    txOutputs.add(utxo);
   }
   return txOutputs;
 };
+
+const fetchCurrentSlotFromServer = async (): Promise<number> => {
+  try {
+    const response = await fetch("/api/v1/network/current-slot");
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: response.statusText }));
+      throw new Error(
+        `Failed to fetch current slot from server: ${response.status} ${errorData.message || "Unknown error"}`,
+      );
+    }
+    const data = await response.json();
+    if (typeof data.currentSlot !== 'number') {
+      throw new Error("Invalid current slot data from server: 'currentSlot' is not a number or missing.");
+    }
+    return data.currentSlot;
+  } catch (error) {
+    console.error("Error fetching current slot from server:", error);
+    throw error;
+  }
+};
+
+interface TransactionError {
+  code?: number;
+  info?: string;
+  message?: string;
+  stack?: string;
+}
 
 export const buildSubmitConwayTx = async (
   builderSuccess: boolean,
@@ -201,120 +323,172 @@ export const buildSubmitConwayTx = async (
   targetDRep: string,
 ) => {
   try {
-    console.log("Building, signing and submitting transaction");
-    // Abort if error before building Tx
-    if (!(await builderSuccess)) {
-      throw new Error("Error before building Tx, aborting Tx build.");
+    console.log("Building transaction: simple ADA output, CSL handles token change.");
+    if (!builderSuccess) {
+      throw new Error("Pre-condition for building Tx failed, aborting Tx build.");
     }
-    // Initialize builder with protocol parameters
-    const txBuilder = await initTransactionBuilder();
-    const transactionWitnessSet = TransactionWitnessSet.new();
 
-    // Add certs, votes, gov actions or donation to the transaction
+    // Fetch protocol parameters
+    const protocolParams = await fetchProtocolParametersFromServer();
+    const txBuilder = await initTransactionBuilder();
+    const currentSlot = await fetchCurrentSlotFromServer();
+
+    if (currentSlot !== undefined) {
+      txBuilder.set_validity_start_interval(currentSlot);
+      txBuilder.set_ttl(currentSlot + 3600 * 2);
+    } else {
+      throw new Error("Failed to set TTL, current slot undefined.");
+    }
 
     const certBuilder = await buildVoteDelegationCert(wallet, targetDRep);
+    if (!certBuilder) throw new Error("Failed to build vote delegation certificate");
+    txBuilder.set_certs_builder(certBuilder);
 
-    if (certBuilder) {
-      txBuilder.set_certs_builder(certBuilder);
-    }
-
-    const [usedAddress] = await wallet.getUsedAddresses();
     const changeAddress = await wallet.getChangeAddress();
+    const shelleyChangeAddress = CSL.Address.from_bech32(changeAddress);
 
-    // Set output and change addresses to those of our wallet
-    const shelleyOutputAddress = Address.from_bech32(usedAddress ?? "");
-    const shelleyChangeAddress = Address.from_bech32(changeAddress);
+    // Fetch all UTxOs from the wallet
+    const allUtxosFromWallet = await getUtxos(wallet._walletName);
+    if (allUtxosFromWallet.length === 0) {
+      throw new Error("No UTxOs available in the wallet to build the transaction.");
+    }
+    const txUnspentOutputs = toTransactionUnspentOutputs(allUtxosFromWallet);
 
-    // Add output of 1 ADA plus total needed for refunds
-    let outputValue = BigNum.from_str("1000000");
-
-    // Ensure the total output is larger than total implicit inputs (refunds / withdrawals)
-    if (!txBuilder.get_implicit_input().is_zero()) {
-      outputValue = outputValue.checked_add(
-        txBuilder.get_implicit_input().coin(),
-      );
+    // Calculate total available ADA
+    let totalInputAda = CSL.BigNum.from_str("0");
+    for (const utxo of allUtxosFromWallet) {
+      totalInputAda = totalInputAda.checked_add(utxo.output().amount().coin());
     }
 
-    // add output to the transaction
-    txBuilder.add_output(
-      TransactionOutput.new(shelleyOutputAddress, Value.new(outputValue)),
-    );
-    // Find the available UTxOs in the wallet and use them as Inputs for the transaction
-    await getUtxos(wallet._walletName);
-    const txUnspentOutputs = await getTxUnspentOutputs(wallet._walletName);
+    // Let CSL handle input selection without automatic change output
+    const strategies = [
+      { id: 3, name: "largest first" },
+      { id: 2, name: "random improve" },
+      { id: 1, name: "random" },
+    ];
 
-    // Use UTxO selection strategy 2 and add change address to be used if needed
-    const changeConfig = ChangeConfig.new(shelleyChangeAddress);
+    let lastError = null;
+    for (const strategy of strategies) {
+      try {
+        console.log(`Attempting coin selection strategy ${strategy.id} (${strategy.name})...`);
+        txBuilder.add_inputs_from(txUnspentOutputs, strategy.id);
+        console.log(`Successfully used coin selection strategy ${strategy.id}`);
+        break;
+      } catch (e) {
+        console.warn(`Coin selection strategy ${strategy.id} (${strategy.name}) failed:`, e);
+        lastError = e;
+        if (strategy.id === 1) {
+          throw new Error(
+            `All coin selection strategies failed. Last error: ${lastError}. Please ensure you have enough ADA to cover the transaction fee.`,
+          );
+        }
+      }
+    }
 
-    // Use UTxO selection strategy 2 if strategy 3 fails
-    try {
-      txBuilder.add_inputs_from_and_change(txUnspentOutputs, 3, changeConfig);
-    } catch (e) {
-      console.error(e);
-      txBuilder.add_inputs_from_and_change(txUnspentOutputs, 2, changeConfig);
+    // Calculate total input value (ADA and tokens)
+    let totalInputValue = CSL.Value.new(CSL.BigNum.from_str("0"));
+    const selectedInputs = txBuilder.get_explicit_input();
+    totalInputValue = totalInputValue.checked_add(selectedInputs);
+
+    // Estimate fee
+    const fee = txBuilder.min_fee();
+    console.log(`Initial estimated fee: ${fee.to_str()} lovelace`);
+    
+    // Add a buffer to the fee to ensure it's sufficient
+    const feeBuffer = CSL.BigNum.from_str("500000"); // 0.5 ADA buffer
+    const adjustedFee = fee.checked_add(feeBuffer);
+    console.log(`Adjusted fee with buffer: ${adjustedFee.to_str()} lovelace`);
+    
+    // Set the adjusted fee
+    txBuilder.set_fee(adjustedFee);
+
+    // From the error, we know the minimum UTxO was 2,116,210 lovelace for an output with tokens
+    const minUtxoLovelace = CSL.BigNum.from_str("2500000"); // Increased minimum UTxO size for safety
+
+    // Create change output manually
+    const changeValue = totalInputValue.checked_sub(CSL.Value.new(adjustedFee));
+    if (changeValue.coin().less_than(minUtxoLovelace)) {
+      console.log(
+        `Change output has ${changeValue.coin().to_str()} lovelace, but requires at least ${minUtxoLovelace.to_str()} lovelace. Adjusting...`,
+      );
+      // Adjust change value to meet minimum UTxO
+      changeValue.set_coin(minUtxoLovelace);
+    }
+    const changeOutput = CSL.TransactionOutput.new(shelleyChangeAddress, changeValue);
+    txBuilder.add_output(changeOutput);
+
+    // Check if wallet has enough ADA
+    const totalRequiredAda = adjustedFee.checked_add(minUtxoLovelace);
+    if (totalInputAda.less_than(totalRequiredAda)) {
+      throw new Error(
+        `Insufficient ADA in wallet. Available: ${totalInputAda.to_str()} lovelace, Required: ${totalRequiredAda.to_str()} lovelace. Please add more funds to your wallet.`,
+      );
     }
 
     // Build transaction body
     const txBody = txBuilder.build();
-    // Make a full transaction, passing in empty witness set
-    const tx = CTransaction.new(
-      txBody,
-      TransactionWitnessSet.from_bytes(transactionWitnessSet.to_bytes()),
-    );
+    console.log("Transaction body built. Fee:", txBuilder.get_fee_if_set()?.to_str());
 
-    // Ask wallet to to provide signature (witnesses) for the transaction
-    let txVkeyWitnesses;
-    // Log the CBOR of tx to console
-    console.log("UnsignedTx: ", Buffer.from(tx.to_bytes()).toString("hex"));
-    txVkeyWitnesses = await wallet.signTx(
-      Buffer.from(tx.to_bytes()).toString("hex"),
-      true,
-    );
-    // Create witness set object using the witnesses provided by the wallet
-    txVkeyWitnesses = TransactionWitnessSet.from_bytes(
-      Buffer.from(txVkeyWitnesses, "hex"),
-    );
-    if (txVkeyWitnesses.vkeys()) {
-      const vkeys = txVkeyWitnesses.vkeys();
-      if (vkeys) {
-        transactionWitnessSet.set_vkeys(vkeys);
-      } else {
-        console.error("vkeys is undefined");
-        throw new Error("vkeys is undefined");
-      }
+    // Log outputs for debugging
+    const outputs = txBody.outputs();
+    for (let i = 0; i < outputs.len(); i++) {
+      const output = outputs.get(i);
+      console.log(`Output ${i} value: ${output.amount().coin().to_str()} lovelace`);
     }
-    // Build transaction with witnesses
-    const signedTx = CTransaction.new(tx.body(), transactionWitnessSet);
 
-    console.log("SignedTx: ", Buffer.from(signedTx.to_bytes()).toString("hex"));
+    const unsignedWitnessSet = CSL.TransactionWitnessSet.new();
+    const unsignedTx = CSL.Transaction.new(txBody, unsignedWitnessSet);
+    const unsignedTxCborHex = Buffer.from(unsignedTx.to_bytes()).toString("hex");
 
-    const result = await submitConwayTx(signedTx, wallet);
+    console.log("Requesting wallet signature...");
+    const signedTxCborHex = await wallet.signTx(unsignedTxCborHex, false);
+    console.log("Signed Transaction CBOR Hex (FOR MANUAL SUBMISSION DEBUG):", signedTxCborHex);
 
-    if (result) {
-      return result;
-    }
+    const signedTx = CSL.Transaction.from_bytes(new Uint8Array(Buffer.from(signedTxCborHex, "hex")));
+
+    return await submitConwayTx(signedTx, wallet);
   } catch (err) {
-    console.error("App.buildSubmitConwayTx", err);
+    console.error("App.buildSubmitConwayTx error:", err);
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    throw new Error(`Delegation failed: ${errorMessage}`);
   }
 };
 
 const submitConwayTx = async (
-  signedTx: CTransaction,
+  signedTx: CSL.Transaction,
   wallet: BrowserWallet,
 ) => {
   try {
-    const result = await wallet.submitTx(
-      Buffer.from(signedTx.to_bytes()).toString("hex"),
-    );
-    console.log("Submitted transaction hash", result);
-    // Set results so they can be rendered
-    const cip95ResultTx = Buffer.from(signedTx.to_bytes()).toString("hex");
+    const txBytes = signedTx.to_bytes();
+    const txHex = Buffer.from(txBytes).toString("hex");
 
-    console.log(cip95ResultTx);
-    return cip95ResultTx;
+    console.log("Transaction details before submission:", {
+      size: txBytes.length,
+      body: signedTx.body().to_hex(),
+      witnessSet: signedTx.witness_set().to_hex(),
+    });
+
+    const result = await wallet.submitTx(txHex);
+    console.log("Submitted transaction hash", result);
+    return txHex;
   } catch (err) {
-    console.log("Error during submission of transaction");
-    console.log(err);
-    return null;
+    const txError = err as TransactionError;
+    console.error("Error during submission of transaction:", {
+      error: err,
+      code: txError.code,
+      info: txError.info,
+      message: txError.message,
+      stack: txError.stack,
+    });
+
+    if (txError.code === 2) {
+      throw new Error(
+        `Transaction submission failed: ${txError.info || "Unknown validation error"}. Please check your wallet balance and network connection.`,
+      );
+    } else if (txError.code === 1) {
+      throw new Error("Transaction submission failed: Network error. Please check your internet connection.");
+    } else {
+      throw new Error(`Transaction submission failed: ${txError.message || "Unknown error"}`);
+    }
   }
 };

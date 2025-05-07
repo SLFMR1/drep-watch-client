@@ -1,5 +1,6 @@
 await import("./src/env.js");
 
+/** @type {import('next').NextConfig} */
 const nextConfig = {
     reactStrictMode: true,
 
@@ -17,11 +18,23 @@ const nextConfig = {
 
     swcMinify: true,
     
-    webpack: (config,options) => {
-        config.experiments = {
-            asyncWebAssembly: true,
-            layers: true,
-        };
+    async rewrites() {
+        return [
+            {
+                source: '/api/:path*',
+                destination: 'http://localhost:8080/api/:path*',
+            },
+        ]
+    },
+
+    /**
+     * @param {import('webpack').Configuration} config
+     * @param {{isServer: boolean}} options
+     * @returns {import('webpack').Configuration}
+     */
+    webpack: (config, { isServer }) => {
+        config.experiments = { ...config.experiments, asyncWebAssembly: true, layers: true };
+        config.output = { ...config.output, webassemblyModuleFilename: 'static/wasm/[modulehash].wasm' };
         return config;
     },
 };
