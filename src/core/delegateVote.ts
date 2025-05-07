@@ -15,7 +15,7 @@ const fetchProtocolParametersFromServer = async () => {
       console.log(`Fetching protocol parameters (attempt ${attempt}/${maxRetries})...`);
       const response = await fetch("/api/v1/network/protocol-parameters", {
         // Add timeout and cache control
-        signal: AbortSignal.timeout(10000), // 10 second timeout
+        signal: AbortSignal.timeout(20000), // 20 second timeout
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
@@ -340,7 +340,13 @@ const toTransactionUnspentOutputs = (utxos: CSL.TransactionUnspentOutput[]): CSL
 
 const fetchCurrentSlotFromServer = async (): Promise<number> => {
   try {
-    const response = await fetch("/api/v1/network/current-slot");
+    const response = await fetch("/api/v1/network/current-slot", {
+      signal: AbortSignal.timeout(20000), // 20 second timeout
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
+    });
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ message: response.statusText }));
       throw new Error(
