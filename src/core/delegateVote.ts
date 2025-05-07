@@ -646,14 +646,14 @@ const submitConwayTx = async (
 
     // Special handling for Typhon
     if (wallet._walletName.toLowerCase().includes('typhon')) {
-      console.log(`[${new Date().toISOString()}] [Typhon] Attempting to submit transaction with special handling`);
+      console.log(`[${new Date().toISOString()}] [Typhon] Attempting to submit transaction (using original build with Typhon UTXO strategy).`);
       try {
-        // Log the full transaction details
-        console.log(`[${new Date().toISOString()}] [Typhon] Full transaction details:`, {
+        // Log the full transaction details of the original signedTx that will be submitted
+        console.log(`[${new Date().toISOString()}] [Typhon] Original transaction details for submission:`, {
           txHexLength: txHex.length,
           bodyHexLength: signedTx.body().to_hex().length,
           witnessSetHexLength: signedTx.witness_set().to_hex().length,
-          size: txBytes.length,
+          size: txBytes.length, // txBytes is signedTx.to_bytes() from L653
           inputs: signedTx.body().inputs().len(),
           outputs: signedTx.body().outputs().len(),
           fee: signedTx.body().fee().to_str(),
@@ -661,68 +661,20 @@ const submitConwayTx = async (
           validityStartInterval: signedTx.body().validity_start_interval()
         });
 
-        // For Typhon, we need to ensure we have a proper change output
-        const outputs = signedTx.body().outputs();
-        if (outputs.len() === 1 && targetDRep) {
-          console.log(`[${new Date().toISOString()}] [Typhon] Single output detected, attempting to add change output`);
-          const txBuilder = await initTransactionBuilder();
-          const changeAddress = await wallet.getChangeAddress();
-          const shelleyChangeAddress = CSL.Address.from_bech32(changeAddress);
-          
-          // Rebuild the transaction with proper change output
-          const certBuilder = await buildVoteDelegationCert(wallet, targetDRep);
-          if (!certBuilder) throw new Error("Failed to build vote delegation certificate");
-          txBuilder.set_certs_builder(certBuilder);
-          
-          // Use the same UTxO selection strategy
-          const allUtxosFromWallet = await getUtxos(wallet._walletName);
-          const txUnspentOutputs = toTransactionUnspentOutputs(allUtxosFromWallet);
-          const changeConfig = CSL.ChangeConfig.new(shelleyChangeAddress);
-          txBuilder.add_inputs_from_and_change(txUnspentOutputs, 3, changeConfig);
-          
-          // Build and sign the new transaction
-          const newTxBody = txBuilder.build();
-          const newUnsignedWitnessSet = CSL.TransactionWitnessSet.new();
-          const newUnsignedTx = CSL.Transaction.new(newTxBody, newUnsignedWitnessSet);
-          const newUnsignedTxCborHex = Buffer.from(newUnsignedTx.to_bytes()).toString("hex");
-          
-          console.log(`[${new Date().toISOString()}] [Typhon] Requesting signature for rebuilt transaction`);
-          const newSignedTxCborHex = await wallet.signTx(newUnsignedTxCborHex, false);
-          const newSignedTx = CSL.Transaction.from_bytes(new Uint8Array(Buffer.from(newSignedTxCborHex, "hex")));
-          
-          console.log(`[${new Date().toISOString()}] [Typhon] New transaction details:`, {
-            size: newSignedTx.to_bytes().length,
-            inputs: newSignedTx.body().inputs().len(),
-            outputs: newSignedTx.body().outputs().len(),
-            fee: newSignedTx.body().fee().to_str()
-          });
-          
-          // Submit the new transaction
-          console.log(`[${new Date().toISOString()}] [Typhon] Submitting rebuilt transaction...`);
-          const submitStartTime = Date.now();
-          const result = await wallet.submitTx(Buffer.from(newSignedTx.to_bytes()).toString("hex"));
-          const submitDuration = Date.now() - submitStartTime;
-          console.log(`[${new Date().toISOString()}] [Typhon] Successfully submitted rebuilt transaction in ${submitDuration}ms:`, result);
-          return Buffer.from(newSignedTx.to_bytes()).toString("hex");
-        }
-
-        // If we already have multiple outputs, try submitting as is
-        try {
-          console.log(`[${new Date().toISOString()}] [Typhon] Submitting original transaction...`);
-          const submitStartTime = Date.now();
-          const result = await wallet.submitTx(txHex);
-          const submitDuration = Date.now() - submitStartTime;
-          console.log(`[${new Date().toISOString()}] [Typhon] Successfully submitted original transaction in ${submitDuration}ms:`, result);
-          return txHex;
-        } catch (rawTxError) {
-          const errorMessage = rawTxError instanceof Error ? rawTxError.message : String(rawTxError);
-          console.warn(`[${new Date().toISOString()}] [Typhon] Raw transaction submission failed: ${errorMessage}`);
-          throw rawTxError;
-        }
-      } catch (typhonError) {
-        const errorMessage = typhonError instanceof Error ? typhonError.message : String(typhonError);
-        console.error(`[${new Date().toISOString()}] [Typhon] Error with special submission: ${errorMessage}`);
-        throw typhonError;
+        console.log(`[${new Date().toISOString()}] [Typhon] Submitting original transaction...`);
+        const submitStartTime = Date.now();
+        const result = await wallet.submitTx(txHex); // txHex is the original signed transaction
+        const submitDuration = Date.now() - submitStartTime;
+        console.log(`[${new Date().toISOString()}] [Typhon] Successfully submitted original transaction in ${submitDuration}ms:`, result);
+        return txHex;
+      } catch (submissionError) {
+        // The type assertion helps access potential 'code' and 'info' properties if Typhon returns structured errors.
+        const error = submissionError as TransactionError;
+        const errorMessage = error.message || (error.info ? `Info: ${error.info} (Code: ${error.code})` : String(submissionError));
+        console.error(`[${new Date().toISOString()}] [Typhon] Error submitting transaction: ${errorMessage}`, submissionError);
+        // Re-throw the error; it will be caught by the main try-catch of the submitConwayTx function,
+        // which already has logic to format it into a user-friendly message.
+        throw submissionError;
       }
     }
 
