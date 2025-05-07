@@ -7,24 +7,72 @@ import { BrowserWallet, resolveStakeKeyHash } from "@meshsdk/core";
 import { convertDRepIdToCIP129 } from "../utils/drepUtils";
 
 const fetchProtocolParametersFromServer = async () => {
-  try {
-    const response = await fetch("/api/v1/network/protocol-parameters");
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ message: response.statusText }));
-      throw new Error(
-        `Failed to fetch protocol parameters from server: ${response.status} ${errorData.message || "Unknown error"}`,
-      );
+  const maxRetries = 3;
+  const retryDelay = 1000; // 1 second
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`Fetching protocol parameters (attempt ${attempt}/${maxRetries})...`);
+      const response = await fetch("/api/v1/network/protocol-parameters", {
+        // Add timeout and cache control
+        signal: AbortSignal.timeout(10000), // 10 second timeout
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: response.statusText }));
+        console.error(`API Error (${response.status}):`, errorData);
+        
+        // If we get a 504 or 500, it might be a temporary server issue
+        if (response.status === 504 || response.status === 500) {
+          throw new Error(`Server temporarily unavailable (${response.status}): ${errorData.message || "Unknown error"}`);
+        }
+        
+        throw new Error(
+          `Failed to fetch protocol parameters from server: ${response.status} ${errorData.message || "Unknown error"}`,
+        );
+      }
+
+      const params = await response.json();
+      if (!params.linearFee || !params.coinsPerUTxOByte) {
+        console.error("Invalid protocol parameters received:", params);
+        throw new Error("Fetched protocol parameters are missing crucial fields.");
+      }
+
+      console.log("Successfully fetched protocol parameters:", params);
+      return params;
+    } catch (error) {
+      console.warn(`Attempt ${attempt} failed:`, error);
+      
+      if (attempt === maxRetries) {
+        // On final attempt, try to use fallback values
+        console.warn("All retry attempts failed, using fallback protocol parameters");
+        return {
+          linearFee: {
+            minFeeA: "44",
+            minFeeB: "155381"
+          },
+          coinsPerUTxOByte: "4310",
+          poolDeposit: "500000000",
+          keyDeposit: "2000000",
+          maxValSize: 5000,
+          maxTxSize: 16384,
+          priceMem: 0.0577,
+          priceStep: 0.0000721
+        };
+      }
+
+      // Wait before retrying with exponential backoff
+      const delay = retryDelay * Math.pow(2, attempt - 1);
+      console.log(`Waiting ${delay}ms before retry...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
-    const params = await response.json();
-    if (!params.linearFee || !params.coinsPerUTxOByte) {
-      throw new Error("Fetched protocol parameters are missing crucial fields.");
-    }
-    console.log("Fetched protocol parameters from server:", params);
-    return params;
-  } catch (error) {
-    console.error("Error fetching protocol parameters from server:", error);
-    throw error;
   }
+
+  throw new Error("Failed to fetch protocol parameters after all retry attempts");
 };
 
 const initTransactionBuilder = async () => {
