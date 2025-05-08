@@ -54,6 +54,9 @@ interface ProfileData {
   references?: Array<Reference>;
   drep_id?: string;
   voting_power?: string;
+  votesYes?: number | null;
+  votesNo?: number | null;
+  votesAbstain?: number | null;
 }
 
 const Profile: React.FC = (): React.ReactNode => {
@@ -129,6 +132,9 @@ const Profile: React.FC = (): React.ReactNode => {
         questionsAsked: 0,
         questionsAnswers: 0,
         references: [],
+        votesYes: 0,
+        votesNo: 0,
+        votesAbstain: 0,
       };
 
       try {
@@ -160,6 +166,9 @@ const Profile: React.FC = (): React.ReactNode => {
           profileDetails.questionsAnswers = indexedDrep.questions_answered_count ?? profileDetails.questionsAnswers;
           profileDetails.drep_id = indexedDrep.drep_id ?? profileDetails.drep_id;
           profileDetails.voting_power = indexedDrep.voting_power?.toString() ?? profileDetails.voting_power;
+          profileDetails.votesYes = (indexedDrep as any).vote_yes ?? profileDetails.votesYes;
+          profileDetails.votesNo = (indexedDrep as any).vote_no ?? profileDetails.votesNo;
+          profileDetails.votesAbstain = (indexedDrep as any).vote_abstain ?? profileDetails.votesAbstain;
 
           if (indexedDrep.name && (!profileDetails.name || profileDetails.name === "Error Loading Name")) {
             profileDetails.name = indexedDrep.name;
@@ -510,6 +519,27 @@ const Profile: React.FC = (): React.ReactNode => {
                   <p className="font-inter text-sm text-gray-400 italic pt-1">No payment address provided by the dRep during registration.</p>
                 )}
               </div>
+
+              {/* Vote Counts Section */}
+              <div className="mt-6 flex flex-col gap-2">
+                <h3 className="font-ibm-mono text-sm font-semibold text-tertiary border-b border-gray-200 pb-2">Voting Record</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                  <div className="flex flex-col items-center justify-center bg-gray-50 p-3 rounded-lg hover:shadow-sm transition-shadow">
+                    <span className="font-neue-regrade text-2xl font-semibold text-green-600">{profileData?.votesYes ?? 0}</span>
+                    <span className="font-inter text-xs text-tertiary mt-1">Yes Votes</span>
+                  </div>
+                  <div className="flex flex-col items-center justify-center bg-gray-50 p-3 rounded-lg hover:shadow-sm transition-shadow">
+                    <span className="font-neue-regrade text-2xl font-semibold text-red-600">{profileData?.votesNo ?? 0}</span>
+                    <span className="font-inter text-xs text-tertiary mt-1">No Votes</span>
+                  </div>
+                  <div className="flex flex-col items-center justify-center bg-gray-50 p-3 rounded-lg hover:shadow-sm transition-shadow">
+                    <span className="font-neue-regrade text-2xl font-semibold text-gray-600">{profileData?.votesAbstain ?? 0}</span>
+                    <span className="font-inter text-xs text-tertiary mt-1">Abstain Votes</span>
+                  </div>
+                </div>
+              </div>
+              {/* End Vote Counts Section */}
+
             </div>
           </div>
         )}

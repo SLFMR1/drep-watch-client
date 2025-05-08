@@ -34,6 +34,9 @@ interface IndexedDrep {
   questions_asked_count: number | null;
   questions_answered_count: number | null;
   voting_power: number | null; 
+  vote_yes: number | null;
+  vote_no: number | null;
+  vote_abstain: number | null;
 }
 
 // Interface for the response from the /indexed endpoint
@@ -75,7 +78,10 @@ type SortOptionValue =
   | 'questions_asked_count_desc'
   | 'name_asc'
   | 'name_desc'
-  | 'voting_power_desc';
+  | 'voting_power_desc'
+  | 'vote_yes_desc'
+  | 'vote_no_desc'
+  | 'vote_abstain_desc';
 
 const sortOptions: { value: SortOptionValue; label: string }[] = [
   { value: 'questions_answered_count_desc', label: 'Questions Answered (High to Low)' }, // Default
@@ -83,6 +89,9 @@ const sortOptions: { value: SortOptionValue; label: string }[] = [
   { value: 'name_asc', label: 'Name (A to Z)' },
   { value: 'name_desc', label: 'Name (Z to A)' },
   { value: 'voting_power_desc', label: 'Voting Power (High to Low)' },
+  { value: 'vote_yes_desc', label: 'Yes Votes (High to Low)' },
+  { value: 'vote_no_desc', label: 'No Votes (High to Low)' },
+  { value: 'vote_abstain_desc', label: 'Abstain Votes (High to Low)' },
 ];
 // --- End Sorting Options --- 
 
@@ -170,7 +179,10 @@ const ExplorerPage = () => {
             active: item.status === 'active', 
             questionsAsked: item.questions_asked_count ?? 0, 
             questionsAnswers: item.questions_answered_count ?? 0,
-            voting_power: item.voting_power
+            voting_power: item.voting_power,
+            votesYes: item.vote_yes ?? 0,
+            votesNo: item.vote_no ?? 0,
+            votesAbstain: item.vote_abstain ?? 0
           }));
         } else {
           console.log(`[Search] No results found in index for: "${query}"`);
@@ -209,7 +221,10 @@ const ExplorerPage = () => {
                  active: item.active, 
                  questionsAsked: 0, // Fallback doesn't provide this easily
                  questionsAnswers: 0, // Fallback doesn't provide this easily
-                 voting_power: null // Keep as null (consistent with number | null)
+                 voting_power: null, // Keep as null (consistent with number | null)
+                 votesYes: 0,
+                 votesNo: 0,
+                 votesAbstain: 0
                }));
             } else {
               console.log(`[Search] No results found via fallback /query for: "${query}"`);
@@ -282,7 +297,10 @@ const ExplorerPage = () => {
           active: item.status === 'active',
           questionsAsked: item.questions_asked_count ?? 0,
           questionsAnswers: item.questions_answered_count ?? 0,
-          voting_power: item.voting_power
+          voting_power: item.voting_power,
+          votesYes: item.vote_yes ?? 0,
+          votesNo: item.vote_no ?? 0,
+          votesAbstain: item.vote_abstain ?? 0
         }));
 
         return {
@@ -329,7 +347,10 @@ const ExplorerPage = () => {
               questionsAsked: drep.questionsAsked || 0,
               questionsAnswers: drep.questionsAnswers || 0,
               active: drep.active !== undefined ? drep.active : true,
-              voting_power: drep.voting_power // Keep as number | null
+              voting_power: drep.voting_power,
+              votesYes: 0,
+              votesNo: 0,
+              votesAbstain: 0
             })),
             nextPage: nextPage,
             questionAnswers: false,
@@ -679,9 +700,6 @@ const ExplorerPage = () => {
                     DREP
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-tertiary">
-                    ID
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-tertiary">
                     Questions Answered
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-tertiary">
@@ -689,6 +707,15 @@ const ExplorerPage = () => {
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-tertiary">
                     Voting Power
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-tertiary">
+                    Yes
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-tertiary">
+                    No
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-tertiary">
+                    Abstain
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-tertiary">
                     Activity Status
@@ -746,6 +773,15 @@ const ExplorerPage = () => {
                       </span>
                     </td>
                     <td className="whitespace-nowrap px-6 py-4">
+                      <span className="font-inter text-sm text-secondary">{(drep as any).votesYes ?? 0}</span>
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4">
+                      <span className="font-inter text-sm text-secondary">{(drep as any).votesNo ?? 0}</span>
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4">
+                      <span className="font-inter text-sm text-secondary">{(drep as any).votesAbstain ?? 0}</span>
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4">
                       <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${ 
                         drep.active 
                           ? "bg-green-100 text-green-800" 
@@ -790,7 +826,7 @@ const ExplorerPage = () => {
                 
                 {searchQuery.trim() !== "" && searchResults.length === 0 && !isSearching && (
                   <tr>
-                    <td colSpan={7} className="px-6 py-10 text-center text-tertiary">
+                    <td colSpan={10} className="px-6 py-10 text-center text-tertiary">
                       No DREPs found for "{searchQuery}". Try a different search term.
                     </td>
                   </tr>
@@ -855,6 +891,19 @@ const ExplorerPage = () => {
                         : '0'
                       } ₳
                     </span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="text-tertiary">Votes Yes:</span>
+                    <span className="text-secondary">{(drep as any).votesYes ?? 0}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-tertiary">Votes No:</span>
+                    <span className="text-secondary">{(drep as any).votesNo ?? 0}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-tertiary">Votes Abstain:</span>
+                    <span className="text-secondary">{(drep as any).votesAbstain ?? 0}</span>
                   </div>
                   
                   <div className="flex items-center justify-between">
