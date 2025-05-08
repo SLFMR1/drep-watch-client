@@ -18,6 +18,21 @@ import { BASE_API_URL } from "~/data/api";
 import { AdminQueAnsCard } from "./cards/AdminQueAnsCard";
 import { useWalletStore } from "~/store/wallet";
 import Masonry from "react-masonry-css";
+import { extractXHandle } from "~/utils/share";
+import type { Question, Answer } from "~/types";
+
+interface DrepProfile {
+  references?: Array<{
+    "@type": string;
+    label: {
+      "@value": string;
+    } | string;
+    uri: {
+      "@value": string;
+    } | string;
+  }>;
+  [key: string]: any;
+}
 
 const Home: React.FC = (): React.ReactNode => {
   const [active, setActive] = useState<number>(FILTER_TYPES.LATEST_ANSWERS);
@@ -40,6 +55,75 @@ const Home: React.FC = (): React.ReactNode => {
 
   // Cache for drep images
   const [drepImages, setDrepImages] = useState<Record<string, string | undefined>>({});
+
+  // Add state for drep profile data
+  const [drepProfiles, setDrepProfiles] = useState<Record<string, DrepProfile>>({});
+
+  // Function to fetch drep profile data
+  const fetchDrepProfile = async (drepId: string) => {
+    if (drepProfiles[drepId]) return drepProfiles[drepId];
+
+    try {
+      const profileResponse = await axios.post(
+        `${BASE_API_URL}/api/v1/drep/drep-profile`,
+        { drep_id: drepId }
+      );
+
+      let profileData = profileResponse.data || {};
+
+      // Try to get additional data from indexed search
+      try {
+        const indexedResponse = await axios.get(
+          `${BASE_API_URL}/api/v1/drep/indexed/search?query=${drepId}`
+        );
+
+        if (indexedResponse.data && Array.isArray(indexedResponse.data) && indexedResponse.data.length > 0) {
+          const indexedDrep = indexedResponse.data[0];
+          if (indexedDrep.references && (!profileData.references || profileData.references.length === 0)) {
+            profileData.references = indexedDrep.references;
+          }
+        }
+      } catch (error) {
+        console.error(`Error fetching indexed data for ${drepId}:`, error);
+      }
+
+      setDrepProfiles(prev => ({ ...prev, [drepId]: profileData }));
+      return profileData;
+    } catch (error) {
+      console.error(`Error fetching profile for ${drepId}:`, error);
+      return null;
+    }
+  };
+
+  // Function to extract X handle from drep profile
+  const getDrepXHandle = (drepId: string): string | undefined => {
+    const profile = drepProfiles[drepId];
+    if (profile?.references && profile.references.length > 0) {
+      const xRef = profile.references.find((ref) => {
+        const uri = typeof ref.uri === 'string' ? ref.uri : ref.uri["@value"];
+        return uri && (uri.includes('twitter.com') || uri.includes('x.com'));
+      });
+      
+      if (xRef) {
+        const uri = typeof xRef.uri === 'string' ? xRef.uri : xRef.uri["@value"];
+        const handle = extractXHandle(uri);
+        return handle || undefined;
+      }
+    }
+    return undefined;
+  };
+
+  // Effect to fetch drep profiles when questions change
+  useEffect(() => {
+    if (pageData?.questionAnswers && 'questions' in pageData) {
+      const uniqueDrepIds = [...new Set(pageData.questions.map((q: Question) => q.drep_id))];
+      uniqueDrepIds.forEach(drepId => {
+        if (drepId && !drepProfiles[drepId]) {
+          fetchDrepProfile(drepId);
+        }
+      });
+    }
+  }, [pageData]);
 
   // Fetch DRep images for all unique drep_ids in the current page
   useEffect(() => {
@@ -242,7 +326,8 @@ const Home: React.FC = (): React.ReactNode => {
                               question={question}
                               answer={pageData.answers[i]}
                               id={pageData.answers[i]?.uuid}
-                              drepImage={drepImages[question.drep_id]}
+                              drepImage={drepImages[question.drep_id] || undefined}
+                              drepXHandle={getDrepXHandle(question.drep_id)}
                               large={false}
                             />
                           </div>
@@ -281,6 +366,7 @@ const Home: React.FC = (): React.ReactNode => {
                             answer={pageData.answers[i]}
                             id={question.uuid}
                             drepImage={drepImages[question.drep_id]}
+                            drepXHandle={getDrepXHandle(question.drep_id)}
                             large={false}
                           />
                         </div>
