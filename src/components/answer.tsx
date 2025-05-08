@@ -3,6 +3,7 @@ import { IoArrowBack } from "react-icons/io5";
 import { FiShare } from "react-icons/fi";
 import { motion } from "framer-motion";
 import Image from "next/image";
+import { MdContentCopy } from "react-icons/md";
 
 import QueAnsCard from "./cards/que-ans";
 import { useQuery } from "@tanstack/react-query";
@@ -349,8 +350,32 @@ const Answer: React.FC = (): React.ReactNode => {
                   </div>
                 </Link>
                 <div className="flex flex-col items-center md:items-start">
-                  <div className="max-w-xs overflow-hidden text-ellipsis text-center font-ibm-mono text-xs tracking-wide text-tertiary md:max-w-max md:text-left md:text-sm">
-                    {data?.question.drep_id.slice(0, 16)}...
+                  <div className="flex items-center gap-1 max-w-xs overflow-hidden text-ellipsis text-center font-ibm-mono text-xs tracking-wide text-tertiary md:max-w-max md:text-left md:text-sm">
+                    {/* Shorten dRep ID for mobile */}
+                    {data?.question.drep_id && data?.question.drep_id.length > 12 ? (
+                      <>
+                        <span className="block md:hidden">
+                          {data?.question.drep_id.slice(0, 7)}....{data?.question.drep_id.slice(-5)}
+                        </span>
+                        <span className="hidden md:block">
+                          {data?.question.drep_id}
+                        </span>
+                      </>
+                    ) : (
+                      data?.question.drep_id ?? ""
+                    )}
+                    <button
+                      onClick={() => {
+                        if (!data?.question.drep_id) return;
+                        navigator.clipboard.writeText(data.question.drep_id)
+                          .then(() => toast.success("ID copied to clipboard"))
+                          .catch(() => toast.error("Failed to copy"));
+                      }}
+                      className="text-gray-400 hover:text-primary transition-colors"
+                      title="Copy full ID"
+                    >
+                      <MdContentCopy size={16} />
+                    </button>
                   </div>
                   <Link href={`/profile/${data?.question.drep_id}`}>
                     <div className="cursor-pointer font-neue-regrade text-[36px] font-semibold text-black hover:underline">
@@ -359,28 +384,28 @@ const Answer: React.FC = (): React.ReactNode => {
                         : `${data?.question.drep_id.slice(0, 16)}...`}
                     </div>
                   </Link>
-                  <div className="mt-5 flex items-center gap-2.5">
-                    <Link
-                      href={`/ask-question?to=${data?.question.drep_id}`}
-                      className="flex items-center gap-2.5 rounded-lg bg-gradient-to-b from-[#FFC896] from-[-47.73%] to-[#FB652B] to-[78.41%] px-4 py-2.5 text-white cursor-pointer"
-                    >
-                      <BsChatQuoteFill className="text-[24px]" />
-                      <div className="text-shadow font-inter text-xs font-medium md:text-sm ">
-                        Ask question
-                      </div>
-                    </Link>
-
-                    <motion.button
-                      onClick={() => onDelegate()}
-                      className="flex items-center gap-2.5 rounded-lg bg-[#EAEAEA] px-4 py-2.5 text-secondary disabled:cursor-not-allowed disabled:opacity-65 cursor-pointer"
-                      whileHover={{ scaleX: 1.025 }}
-                      whileTap={{ scaleX: 0.995 }}
-                    >
-                      <div className="font-inter text-xs font-medium md:text-sm ">
-                        Delegate
-                      </div>
-                    </motion.button>
-                    
+                  <div className="mt-5 flex flex-col md:flex-row items-center justify-center md:justify-start gap-2.5 w-full">
+                    <div className="flex flex-row gap-2.5 w-full md:w-auto">
+                      <Link
+                        href={`/ask-question?to=${data?.question.drep_id}`}
+                        className="flex flex-1 items-center gap-2.5 rounded-lg bg-gradient-to-b from-[#FFC896] from-[-47.73%] to-[#FB652B] to-[78.41%] px-4 py-2.5 text-white justify-center"
+                      >
+                        <BsChatQuoteFill className="text-[24px]" />
+                        <div className="text-shadow font-inter text-xs font-medium md:text-sm ">
+                          Ask question
+                        </div>
+                      </Link>
+                      <motion.button
+                        onClick={() => onDelegate()}
+                        className="flex flex-1 items-center gap-2.5 rounded-lg bg-[#EAEAEA] px-4 py-2.5 text-secondary disabled:cursor-not-allowed disabled:opacity-65 justify-center"
+                        whileHover={{ scaleX: 1.025 }}
+                        whileTap={{ scaleX: 0.995 }}
+                      >
+                        <div className="font-inter text-xs font-medium md:text-sm ">
+                          Delegate
+                        </div>
+                      </motion.button>
+                    </div>
                     <motion.button
                       onClick={() => {
                         if (data?.question.drep_id) {
@@ -401,7 +426,7 @@ const Answer: React.FC = (): React.ReactNode => {
                           shareDrepProfile(data.question.drep_id, profileData?.name, xHandle);
                         }
                       }}
-                      className="flex items-center gap-2.5 rounded-lg bg-black px-4 py-2.5 text-white cursor-pointer"
+                      className="flex items-center justify-center gap-2 rounded-lg bg-black px-3 py-2 text-white w-full max-w-[160px] mx-auto md:w-auto md:ml-2 md:px-4 md:py-2.5"
                       whileHover={{ scaleX: 1.025 }}
                       whileTap={{ scaleX: 0.995 }}
                     >
