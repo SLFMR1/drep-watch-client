@@ -367,7 +367,19 @@ const Profile: React.FC = (): React.ReactNode => {
             <div className="flex flex-col">
               <div className="flex items-center gap-1 justify-center md:justify-start">
                 <div className="w-auto overflow-hidden text-ellipsis text-center font-ibm-mono text-xs tracking-wide text-tertiary md:text-left md:text-sm">
-                  {canonicalDrepId ?? ""}
+                  {/* Shorten dRep ID for mobile */}
+                  {canonicalDrepId && canonicalDrepId.length > 12 ? (
+                    <>
+                      <span className="block md:hidden">
+                        {canonicalDrepId.slice(0, 7)}....{canonicalDrepId.slice(-5)}
+                      </span>
+                      <span className="hidden md:block">
+                        {canonicalDrepId}
+                      </span>
+                    </>
+                  ) : (
+                    canonicalDrepId ?? ""
+                  )}
                 </div>
                 <button 
                   onClick={() => copyToClipboard(canonicalDrepId)}
@@ -379,82 +391,68 @@ const Profile: React.FC = (): React.ReactNode => {
               </div>
               {/* Voting Power Display */}
               {profileData?.voting_power && (
-                    <p className="pt-1 text-sm text-grey-100">
-                      Voting Power: {(parseInt(profileData.voting_power) / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 0 })} ₳
-                    </p>
-                  )}
-                  {/* End Voting Power Display */}
+                <p className="pt-1 text-sm text-grey-100 text-center mx-auto md:text-left md:mx-0">
+                  Voting Power: {(parseInt(profileData.voting_power) / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 0 })} ₳
+                </p>
+              )}
+              {/* End Voting Power Display */}
               <div className="text-center font-neue-regrade text-[36px] font-semibold text-black md:text-start">
                 {profileData?.name ?? `${canonicalDrepId?.slice(0, 16) ?? ''}...`}
               </div>
-              
               {isIdMismatch && (
                 <div className="mt-2 text-center md:text-left text-xs text-orange-600 bg-orange-50 p-2 rounded border border-orange-200">
                   Note: You searched for <code>{queriedDrepId}</code>, which is associated with the current canonical ID <code>{canonicalDrepId}</code>.
                 </div>
               )}
-              
-              <div className="mt-5 flex items-center justify-center md:justify-start gap-2.5">
-                {canonicalDrepId && canonicalDrepId.startsWith("drep") && (
-                  <>
-                    <Link
-                      href={isDrepActive ? `/ask-question?to=${canonicalDrepId}` : "#"}
-                      onClick={(e) => !isDrepActive && e.preventDefault()}
-                      className={`flex items-center gap-2.5 rounded-lg px-4 py-2.5 ${
-                        isDrepActive 
-                          ? "bg-gradient-to-b from-[#FFC896] from-[-47.73%] to-[#FB652B] to-[78.41%] text-white" 
-                          : "bg-gray-200 text-gray-500 cursor-not-allowed"
-                      }`}
-                    >
-                      <BsChatQuoteFill className="text-[24px]" />
-                      <div className="text-shadow font-inter text-xs font-medium md:text-sm">
-                        {isDrepActive ? "Ask question" : "Inactive dRep"}
-                      </div>
-                    </Link>
-
-                    <motion.button
-                      className={`flex items-center gap-2.5 rounded-lg px-4 py-2.5 ${
-                        isDrepActive 
-                          ? "bg-[#EAEAEA] text-secondary" 
-                          : "bg-gray-200 text-gray-500 cursor-not-allowed"
-                      }`}
-                      whileHover={isDrepActive ? { scaleX: 1.025 } : undefined}
-                      whileTap={isDrepActive ? { scaleX: 0.995 } : undefined}
-                      onClick={onDelegate}
-                      disabled={!isDrepActive}
-                    >
-                      <div className="font-inter text-xs font-medium md:text-sm">
-                        Delegate
-                      </div>
-                    </motion.button>
-                    
-                    <motion.button
-                      className="flex items-center gap-2.5 rounded-lg bg-black px-4 py-2.5 text-white"
-                      whileHover={{ scaleX: 1.025 }}
-                      whileTap={{ scaleX: 0.995 }}
-                      onClick={handleShare}
-                    >
-                      <FiShare className="text-[18px]" />
-                      <div className="font-inter text-xs font-medium md:text-sm">
-                        Share
-                      </div>
-                    </motion.button>
-                  </>
-                )}
-                
-                {canonicalDrepId && !canonicalDrepId.startsWith("drep") && (
-                  <motion.button
-                    className="flex items-center gap-2.5 rounded-lg bg-black px-4 py-2.5 text-white"
-                    whileHover={{ scaleX: 1.025 }}
-                    whileTap={{ scaleX: 0.995 }}
-                    onClick={handleShare}
-                  >
-                    <FiShare className="text-[18px]" />
-                    <div className="font-inter text-xs font-medium md:text-sm">
-                      Share
-                    </div>
-                  </motion.button>
-                )}
+              {/* Action Buttons: Ask, Delegate, Share. Share below on mobile */}
+              <div className="mt-5 flex flex-col md:flex-row items-center justify-center md:justify-start gap-2.5 w-full">
+                <div className="flex flex-row gap-2.5 w-full md:w-auto">
+                  {canonicalDrepId && canonicalDrepId.startsWith("drep") && (
+                    <>
+                      <Link
+                        href={isDrepActive ? `/ask-question?to=${canonicalDrepId}` : "#"}
+                        onClick={(e) => !isDrepActive && e.preventDefault()}
+                        className={`flex flex-1 items-center gap-2.5 rounded-lg px-4 py-2.5 justify-center ${
+                          isDrepActive 
+                            ? "bg-gradient-to-b from-[#FFC896] from-[-47.73%] to-[#FB652B] to-[78.41%] text-white" 
+                            : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                        }`}
+                      >
+                        <BsChatQuoteFill className="text-[24px]" />
+                        <div className="text-shadow font-inter text-xs font-medium md:text-sm">
+                          {isDrepActive ? "Ask question" : "Inactive dRep"}
+                        </div>
+                      </Link>
+                      <motion.button
+                        className={`flex flex-1 items-center gap-2.5 rounded-lg px-4 py-2.5 justify-center ${
+                          isDrepActive 
+                            ? "bg-[#EAEAEA] text-secondary" 
+                            : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                        }`}
+                        whileHover={isDrepActive ? { scaleX: 1.025 } : undefined}
+                        whileTap={isDrepActive ? { scaleX: 0.995 } : undefined}
+                        onClick={onDelegate}
+                        disabled={!isDrepActive}
+                      >
+                        <div className="font-inter text-xs font-medium md:text-sm">
+                          Delegate
+                        </div>
+                      </motion.button>
+                    </>
+                  )}
+                </div>
+                {/* Share button below on mobile, inline on desktop */}
+                <motion.button
+                  className="flex items-center justify-center gap-2 rounded-lg bg-black px-3 py-2 text-white w-full max-w-[160px] mx-auto md:w-auto md:ml-2 md:px-4 md:py-2.5"
+                  whileHover={{ scaleX: 1.025 }}
+                  whileTap={{ scaleX: 0.995 }}
+                  onClick={handleShare}
+                >
+                  <FiShare className="text-[18px]" />
+                  <div className="font-inter text-xs font-medium md:text-sm">
+                    Share
+                  </div>
+                </motion.button>
               </div>
             </div>
           </div>
@@ -463,7 +461,7 @@ const Profile: React.FC = (): React.ReactNode => {
         {/* Drep Metadata Section - Only display for dReps, not for delegators */}
         {canonicalDrepId && canonicalDrepId.startsWith("drep") && (
           <div className="mt-12 flex justify-center">
-            <div className="w-[70%] rounded-xl border border-primary-light bg-white p-6 shadow-color md:w-[70%] md:px-8 md:py-7">
+            <div className="w-[90%] md:w-[70%] rounded-xl border border-primary-light bg-white p-6 shadow-color md:px-8 md:py-7">
               <h2 className="mb-6 font-neue-regrade text-xl font-semibold text-black border-b border-primary-light pb-3">
                 Profile Information
                 {!isDrepActive && (
