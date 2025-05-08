@@ -81,7 +81,8 @@ type SortOptionValue =
   | 'voting_power_desc'
   | 'vote_yes_desc'
   | 'vote_no_desc'
-  | 'vote_abstain_desc';
+  | 'vote_abstain_desc'
+  | 'votes_total_desc';
 
 const sortOptions: { value: SortOptionValue; label: string }[] = [
   { value: 'questions_answered_count_desc', label: 'Questions Answered (High to Low)' }, // Default
@@ -92,6 +93,7 @@ const sortOptions: { value: SortOptionValue; label: string }[] = [
   { value: 'vote_yes_desc', label: 'Yes Votes (High to Low)' },
   { value: 'vote_no_desc', label: 'No Votes (High to Low)' },
   { value: 'vote_abstain_desc', label: 'Abstain Votes (High to Low)' },
+  { value: 'votes_total_desc', label: 'Voting Activity (High to Low)' },
 ];
 // --- End Sorting Options --- 
 
@@ -737,13 +739,12 @@ const ExplorerPage = () => {
                           <span className="font-neue-regrade font-medium text-black">
                             {drep.givenName || "Unnamed DREP"}
                           </span>
-                          <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold leading-5 ${
-                            drep.active
-                              ? "bg-green-100 text-green-800"
-                              : "bg-red-100 text-red-800"
-                          }`}>
-                            {drep.active ? "Active" : "Inactive"}
-                          </span>
+                          <span
+                            title={drep.active ? "Active" : "Inactive"}
+                            className={`mt-1 inline-block w-3 h-3 rounded-full ${
+                              drep.active ? "bg-green-500" : "bg-red-500"
+                            }`}
+                          ></span>
                         </div>
                       </Link>
                     </td>
@@ -831,13 +832,12 @@ const ExplorerPage = () => {
                       <span className="font-neue-regrade font-medium text-black">
                         {drep.givenName || "Unnamed DREP"}
                       </span>
-                      <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold leading-5 ${
-                        drep.active
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
-                      }`}>
-                        {drep.active ? "Active" : "Inactive"}
-                      </span>
+                      <span
+                        title={drep.active ? "Active" : "Inactive"}
+                        className={`mt-1 inline-block w-3 h-3 rounded-full ${
+                          drep.active ? "bg-green-500" : "bg-red-500"
+                        }`}
+                      ></span>
                     </div>
                   </Link>
                 </div>
