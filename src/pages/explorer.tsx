@@ -639,7 +639,7 @@ const ExplorerPage = () => {
     <>
       <Metatags />
       
-      <div className="container mx-auto px-6 py-8">
+      <div className="container mx-auto px-6 py-8 pt-20 md:pt-8">
         <h1 className="hidden md:block mb-6 mt-4 pl-2 font-neue-regrade text-3xl font-bold text-black">dRep Explorer</h1>
         
         <div className="mb-6 flex flex-col md:flex-row md:items-center gap-4">
