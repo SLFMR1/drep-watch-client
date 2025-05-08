@@ -737,12 +737,6 @@ const ExplorerPage = () => {
                           <span className="font-neue-regrade font-medium text-black">
                             {drep.givenName || "Unnamed DREP"}
                           </span>
-                          <span
-                            title={drep.active ? "Active" : "Inactive"}
-                            className={`mt-1 inline-block w-3 h-3 rounded-full ${
-                              drep.active ? "bg-green-500" : "bg-red-500"
-                            }`}
-                          ></span>
                         </div>
                       </Link>
                     </td>
@@ -830,12 +824,6 @@ const ExplorerPage = () => {
                       <span className="font-neue-regrade font-medium text-black">
                         {drep.givenName || "Unnamed DREP"}
                       </span>
-                      <span
-                        title={drep.active ? "Active" : "Inactive"}
-                        className={`mt-1 inline-block w-3 h-3 rounded-full ${
-                          drep.active ? "bg-green-500" : "bg-red-500"
-                        }`}
-                      ></span>
                     </div>
                   </Link>
                 </div>
