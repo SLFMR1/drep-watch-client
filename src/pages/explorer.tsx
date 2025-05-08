@@ -81,7 +81,8 @@ type SortOptionValue =
   | 'voting_power_desc'
   | 'vote_yes_desc'
   | 'vote_no_desc'
-  | 'vote_abstain_desc';
+  | 'vote_abstain_desc'
+  | 'votes_total_desc';
 
 const sortOptions: { value: SortOptionValue; label: string }[] = [
   { value: 'questions_answered_count_desc', label: 'Questions Answered (High to Low)' }, // Default
@@ -92,6 +93,7 @@ const sortOptions: { value: SortOptionValue; label: string }[] = [
   { value: 'vote_yes_desc', label: 'Yes Votes (High to Low)' },
   { value: 'vote_no_desc', label: 'No Votes (High to Low)' },
   { value: 'vote_abstain_desc', label: 'Abstain Votes (High to Low)' },
+  { value: 'votes_total_desc', label: 'Total Votes (High to Low)' },
 ];
 // --- End Sorting Options --- 
 
