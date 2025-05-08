@@ -39,6 +39,7 @@ interface QueAnsCardProps {
   answer?: Answer;
   asked_user?: string;
   drepXHandle?: string;
+  drepImage?: string;
 }
 
 const QueAnsCard: React.FC<QueAnsCardProps> = ({
@@ -48,8 +49,9 @@ const QueAnsCard: React.FC<QueAnsCardProps> = ({
   answer,
   asked_user,
   drepXHandle,
+  drepImage,
 }: QueAnsCardProps): React.ReactNode => {
-  const { route } = useRouter();
+  const { route, push } = useRouter();
   const queryClient = useQueryClient();
 
   const [enlargeText, setEnlargeText] = useState(false);
@@ -155,7 +157,7 @@ const QueAnsCard: React.FC<QueAnsCardProps> = ({
       whileHover={{ y: large ? 0 : -6 }}
       onClick={() => {
         if (!large && id) {
-          window.location.href = `/answer/${id}`;
+          push(`/answer/${id}`);
         }
       }}
     >
@@ -272,7 +274,7 @@ const QueAnsCard: React.FC<QueAnsCardProps> = ({
               className="rounded-lg bg-gradient-to-b from-[#FFC896] from-[-47.73%] to-[#FB652B] to-[78.41%] px-4 py-2.5 text-white font-semibold text-sm shadow-md hover:brightness-105 transition"
               onClick={e => {
                 e.stopPropagation();
-                if (id) window.location.href = `/answer/${id}`;
+                if (id) push(`/answer/${id}`);
               }}
             >
               Answer
@@ -328,6 +330,7 @@ const QueAnsCard: React.FC<QueAnsCardProps> = ({
                   rounded
                   username={(answer.drep_name && answer.drep_name.length > 0) ? answer.drep_name : answer.drep_id}
                   dimension={32}
+                  src={drepImage}
                 />
               </div>
             </Link>

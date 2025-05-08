@@ -2,6 +2,7 @@ import { LegacyRef, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import Image from "next/image";
+import axios from "axios";
 
 import ProfileCard from "./cards/profile";
 import QueAnsCard from "./cards/que-ans";
@@ -36,6 +37,33 @@ const Home: React.FC = (): React.ReactNode => {
     refetchIntervalInBackground: active !== FILTER_TYPES.EXPLORE_DREPS,
     refetchOnMount: active !== FILTER_TYPES.EXPLORE_DREPS,
   });
+
+  // Cache for drep images
+  const [drepImages, setDrepImages] = useState<Record<string, string | undefined>>({});
+
+  // Fetch DRep images for all unique drep_ids in the current page
+  useEffect(() => {
+    if (!pageData || !('questionAnswers' in pageData) || !pageData.questionAnswers || !('questions' in pageData) || !Array.isArray(pageData.questions)) return;
+    const uniqueDrepIds = Array.from(new Set(pageData.questions.map((q: any) => q.drep_id)));
+    const missingIds = uniqueDrepIds.filter((id: string) => !(id in drepImages));
+    if (missingIds.length === 0) return;
+    Promise.all(
+      missingIds.map(async (drep_id: string) => {
+        try {
+          const res = await axios.get(`${BASE_API_URL}/api/v1/drep/indexed/search?query=${drep_id}`);
+          if (Array.isArray(res.data) && res.data.length > 0 && res.data[0].image_url) {
+            return { id: drep_id, image: res.data[0].image_url };
+          }
+        } catch (e) {}
+        return { id: drep_id, image: undefined };
+      })
+    ).then(results => {
+      const newImages = { ...drepImages };
+      results.forEach(({ id, image }) => { if (typeof id === 'string') newImages[id] = image; });
+      setDrepImages(newImages);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageData]);
 
   useEffect(() => {
     const activeFilterIndex = FILTERS.filter(f => f.type !== FILTER_TYPES.EXPLORE_DREPS).findIndex(filter => filter.type === active);
@@ -213,6 +241,7 @@ const Home: React.FC = (): React.ReactNode => {
                             question={question}
                             answer={pageData.answers[i]}
                             id={question.uuid}
+                            drepImage={drepImages[question.drep_id]}
                             large={false}
                           />
                         </div>
@@ -249,6 +278,7 @@ const Home: React.FC = (): React.ReactNode => {
                             question={question}
                             answer={pageData.answers[i]}
                             id={question.uuid}
+                            drepImage={drepImages[question.drep_id]}
                             large={false}
                           />
                         </div>

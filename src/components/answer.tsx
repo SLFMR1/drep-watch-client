@@ -89,7 +89,7 @@ import {
 } from "@emurgo/cardano-serialization-lib-asmjs";
 import { useState } from "react";
 import { buildSubmitConwayTx } from "~/core/delegateVote";
-import { shareQuestionAnswer, extractXHandle } from "~/utils/share";
+import { shareQuestionAnswer, extractXHandle, shareDrepProfile } from "~/utils/share";
 import { type BrowserWallet } from '@meshsdk/core';
 
 const protocolParams = {
@@ -344,6 +344,7 @@ const Answer: React.FC = (): React.ReactNode => {
                     <LetterAvatar
                       username={data?.question.drep_id}
                       dimension={130}
+                      src={profileData?.image || undefined}
                     />
                   </div>
                 </Link>
@@ -381,7 +382,25 @@ const Answer: React.FC = (): React.ReactNode => {
                     </motion.button>
                     
                     <motion.button
-                      onClick={handleShare}
+                      onClick={() => {
+                        if (data?.question.drep_id) {
+                          let xHandle: string | undefined = undefined;
+                          if (profileData?.references && profileData.references.length > 0) {
+                            const xRef = profileData.references.find((ref: Reference) => {
+                              const uri = typeof ref.uri === 'string' ? ref.uri : ref.uri["@value"];
+                              return uri && (uri.includes('twitter.com') || uri.includes('x.com'));
+                            });
+                            if (xRef) {
+                              const uri = typeof xRef.uri === 'string' ? xRef.uri : xRef.uri["@value"];
+                              const handle = extractXHandle(uri);
+                              if (handle) {
+                                xHandle = handle;
+                              }
+                            }
+                          }
+                          shareDrepProfile(data.question.drep_id, profileData?.name, xHandle);
+                        }
+                      }}
                       className="flex items-center gap-2.5 rounded-lg bg-black px-4 py-2.5 text-white cursor-pointer"
                       whileHover={{ scaleX: 1.025 }}
                       whileTap={{ scaleX: 0.995 }}
@@ -429,6 +448,7 @@ const Answer: React.FC = (): React.ReactNode => {
                   }
                   return undefined;
                 })()}
+                drepImage={profileData?.image}
               />
             </div>
 
@@ -476,6 +496,7 @@ const Answer: React.FC = (): React.ReactNode => {
                                 }
                                 return undefined;
                               })()}
+                              drepImage={profileData?.image}
                             />
                           </div>
                         );

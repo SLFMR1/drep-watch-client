@@ -311,6 +311,22 @@ const Profile: React.FC = (): React.ReactNode => {
     }
   };
 
+  // Extract drepXHandle (Twitter/X handle) from profileData.references
+  let drepXHandle: string | undefined = undefined;
+  if (profileData?.references && profileData.references.length > 0) {
+    const xRef = profileData.references.find((ref: Reference) => {
+      const uri = typeof ref.uri === 'string' ? ref.uri : ref.uri["@value"];
+      return uri && (uri.includes('twitter.com') || uri.includes('x.com'));
+    });
+    if (xRef) {
+      const uri = typeof xRef.uri === 'string' ? xRef.uri : xRef.uri["@value"];
+      const handle = extractXHandle(uri);
+      if (handle) {
+        drepXHandle = handle;
+      }
+    }
+  }
+
   return (
     <section className="flex w-full flex-col gap-[40px] pb-20 pt-[150px] md:gap-[90px] md:pt-[190px]">
       <div className="container mx-auto px-4 relative">
@@ -622,6 +638,8 @@ const Profile: React.FC = (): React.ReactNode => {
                           question={question}
                           answer={questions.answers[i]}
                           id={question.uuid}
+                          drepXHandle={drepXHandle}
+                          drepImage={profileData?.image}
                         />
                       </div>
                     ))}
