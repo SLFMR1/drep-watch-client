@@ -742,23 +742,6 @@ const ExplorerPage = () => {
                       </Link>
                     </td>
                     <td className="whitespace-nowrap px-6 py-4">
-                      <div className="flex items-center space-x-1">
-                        <span className="font-ibm-mono text-sm text-tertiary">
-                          {formatDrepId(drep.drep_id)}
-                        </span>
-                        <button 
-                          onClick={(e) => {
-                            e.preventDefault();
-                            copyToClipboard(drep.drep_id);
-                          }}
-                          className="text-gray-400 hover:text-primary transition-colors"
-                          title="Copy full ID"
-                        >
-                          <MdContentCopy size={16} />
-                        </button>
-                      </div>
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4">
                       <span className="font-inter text-sm text-secondary">{drep.questionsAnswers ?? 0}</span>
                     </td>
                     <td className="whitespace-nowrap px-6 py-4">
@@ -854,25 +837,6 @@ const ExplorerPage = () => {
                 </div>
                 
                 <div className="space-y-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-tertiary">ID:</span>
-                    <div className="flex items-center space-x-1">
-                      <span className="font-ibm-mono text-secondary">
-                        {formatDrepId(drep.drep_id)}
-                      </span>
-                      <button 
-                        onClick={(e) => {
-                          e.preventDefault();
-                          copyToClipboard(drep.drep_id);
-                        }}
-                        className="text-gray-400 hover:text-primary transition-colors"
-                        title="Copy full ID"
-                      >
-                        <MdContentCopy size={16} />
-                      </button>
-                    </div>
-                  </div>
-                  
                   <div className="flex items-center justify-between">
                     <span className="text-tertiary">Questions Answered:</span>
                     <span className="text-secondary">{drep.questionsAnswers ?? 0}</span>
