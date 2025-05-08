@@ -718,9 +718,6 @@ const ExplorerPage = () => {
                     Abstain
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-tertiary">
-                    Activity Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-tertiary">
                     Actions
                   </th>
                 </tr>
@@ -736,9 +733,18 @@ const ExplorerPage = () => {
                           rounded
                           src={drep.image || null}
                         />
-                        <span className="font-neue-regrade font-medium text-black">
-                          {drep.givenName || "Unnamed DREP"}
-                        </span>
+                        <div className="flex flex-col">
+                          <span className="font-neue-regrade font-medium text-black">
+                            {drep.givenName || "Unnamed DREP"}
+                          </span>
+                          <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold leading-5 ${
+                            drep.active
+                              ? "bg-green-100 text-green-800"
+                              : "bg-red-100 text-red-800"
+                          }`}>
+                            {drep.active ? "Active" : "Inactive"}
+                          </span>
+                        </div>
                       </Link>
                     </td>
                     <td className="whitespace-nowrap px-6 py-4">
@@ -763,15 +769,6 @@ const ExplorerPage = () => {
                     </td>
                     <td className="whitespace-nowrap px-6 py-4">
                       <span className="font-inter text-sm text-secondary">{(drep as any).votesAbstain ?? 0}</span>
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4">
-                      <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${ 
-                        drep.active 
-                          ? "bg-green-100 text-green-800" 
-                          : "bg-red-100 text-red-800"
-                      }`}>
-                        {drep.active ? "Active" : "Inactive"}
-                      </span>
                     </td>
                     <td className="whitespace-nowrap px-6 py-4">
                       <div className="flex items-center gap-2">
@@ -809,7 +806,7 @@ const ExplorerPage = () => {
                 
                 {searchQuery.trim() !== "" && searchResults.length === 0 && !isSearching && (
                   <tr>
-                    <td colSpan={10} className="px-6 py-10 text-center text-tertiary">
+                    <td colSpan={8} className="px-6 py-10 text-center text-tertiary">
                       No DREPs found for "{searchQuery}". Try a different search term.
                     </td>
                   </tr>
@@ -830,9 +827,18 @@ const ExplorerPage = () => {
                       rounded
                       src={drep.image || null}
                     />
-                    <span className="font-neue-regrade font-medium text-black">
-                      {drep.givenName || "Unnamed DREP"}
-                    </span>
+                    <div className="flex flex-col">
+                      <span className="font-neue-regrade font-medium text-black">
+                        {drep.givenName || "Unnamed DREP"}
+                      </span>
+                      <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold leading-5 ${
+                        drep.active
+                          ? "bg-green-100 text-green-800"
+                          : "bg-red-100 text-red-800"
+                      }`}>
+                        {drep.active ? "Active" : "Inactive"}
+                      </span>
+                    </div>
                   </Link>
                 </div>
                 
@@ -868,17 +874,6 @@ const ExplorerPage = () => {
                   <div className="flex items-center justify-between">
                     <span className="text-tertiary">Votes Abstain:</span>
                     <span className="text-secondary">{(drep as any).votesAbstain ?? 0}</span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <span className="text-tertiary">Status:</span>
-                    <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${ 
-                      drep.active 
-                        ? "bg-green-100 text-green-800" 
-                        : "bg-red-100 text-red-800"
-                    }`}>
-                      {drep.active ? "Active" : "Inactive"}
-                    </span>
                   </div>
                 </div>
 
