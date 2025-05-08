@@ -51,7 +51,7 @@ const QueAnsCard: React.FC<QueAnsCardProps> = ({
   drepXHandle,
   drepImage,
 }: QueAnsCardProps): React.ReactNode => {
-  const { route, push } = useRouter();
+  const { route } = useRouter();
   const queryClient = useQueryClient();
 
   const [enlargeText, setEnlargeText] = useState(false);
@@ -157,7 +157,7 @@ const QueAnsCard: React.FC<QueAnsCardProps> = ({
       whileHover={{ y: large ? 0 : -6 }}
       onClick={() => {
         if (!large && id) {
-          push(`/answer/${id}`);
+          window.location.href = `/answer/${id}`;
         }
       }}
     >
@@ -274,7 +274,7 @@ const QueAnsCard: React.FC<QueAnsCardProps> = ({
               className="rounded-lg bg-gradient-to-b from-[#FFC896] from-[-47.73%] to-[#FB652B] to-[78.41%] px-4 py-2.5 text-white font-semibold text-sm shadow-md hover:brightness-105 transition"
               onClick={e => {
                 e.stopPropagation();
-                if (id) push(`/answer/${id}`);
+                if (id) window.location.href = `/answer/${id}`;
               }}
             >
               Answer

@@ -234,18 +234,20 @@ const Home: React.FC = (): React.ReactNode => {
                       className="masonry-grid"
                       columnClassName="masonry-column"
                     >
-                      {pageData.questions.map((question, i) => (
-                        <div key={question.uuid || i} className="masonry-item">
-                          <QueAnsCard
-                            asked_user={question.wallet_address}
-                            question={question}
-                            answer={pageData.answers[i]}
-                            id={question.uuid}
-                            drepImage={drepImages[question.drep_id]}
-                            large={false}
-                          />
-                        </div>
-                      ))}
+                      {pageData.questions.map((question, i) => {
+                        return (
+                          <div key={pageData.answers[i]?.uuid || question.uuid || i} className="masonry-item">
+                            <QueAnsCard
+                              asked_user={question.wallet_address}
+                              question={question}
+                              answer={pageData.answers[i]}
+                              id={pageData.answers[i]?.uuid}
+                              drepImage={drepImages[question.drep_id]}
+                              large={false}
+                            />
+                          </div>
+                        );
+                      })}
                     </Masonry>
                   )
                 )
