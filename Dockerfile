@@ -1,8 +1,8 @@
-FROM node:18-slim
+FROM --platform=linux/amd64 node:18-slim
 
 # Set environment variables
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD="true" \
-    PUPPETEER_EXECUTABLE_PATH="/usr/bin/google-chrome" \
+    PUPPETEER_EXECUTABLE_PATH="/opt/google/chrome/chrome" \
     NODE_ENV="production" \
     PNPM_HOME="/pnpm" \
     PATH="$PNPM_HOME:$PATH" \
@@ -44,10 +44,7 @@ RUN apt-get update && apt-get install -y \
     libxext6 \
     libxfixes3 \
     libxi6 \
-    libxrandr2 \
     libxrender1 \
-    libxss1 \
-    libxtst6 \
     fonts-ipafont-gothic \
     fonts-wqy-zenhei \
     fonts-thai-tlwg \
@@ -55,26 +52,24 @@ RUN apt-get update && apt-get install -y \
     fonts-freefont-ttf \
     xvfb \
     xauth \
-    --no-install-recommends
+    --no-install-recommends && \
+    # Clean up apt lists immediately after installing dependencies
+    rm -rf /var/lib/apt/lists/*
 
-# Install Chrome
-RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google.list \
-    && apt-get update \
-    && apt-get install -y google-chrome-stable --no-install-recommends
+# Download and Install Chrome
+RUN wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
+    apt-get update && apt-get install -y ./google-chrome-stable_current_amd64.deb --no-install-recommends && \
+    rm google-chrome-stable_current_amd64.deb && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Verify Chrome installation and print version
-RUN google-chrome --version
+RUN /opt/google/chrome/chrome --version
 
 # Create Chrome user and group with proper permissions
 RUN groupadd -r chrome && useradd -r -g chrome -G audio,video chrome \
     && mkdir -p /home/chrome \
     && chown -R chrome:chrome /home/chrome
-
-# Clean up
-RUN apt-get clean \
-    && rm -rf /var/lib/apt/lists/* \
-    && rm -rf /src/*.deb
 
 # Create and set working directory
 WORKDIR /app

@@ -22,7 +22,7 @@ const nextConfig = {
     env: {
         PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "true",
         PUPPETEER_EXECUTABLE_PATH: process.env.NODE_ENV === 'production' 
-            ? '/usr/bin/google-chrome'
+            ? '/opt/google/chrome/chrome'
             : undefined
     },
     
