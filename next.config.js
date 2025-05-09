@@ -20,10 +20,10 @@ const nextConfig = {
     
     // Add environment variables for Puppeteer
     env: {
-        PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: true,
+        PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "true",
         PUPPETEER_EXECUTABLE_PATH: process.env.NODE_ENV === 'production' 
             ? '/usr/bin/google-chrome'
-            : undefined,
+            : undefined
     },
     
     async rewrites() {

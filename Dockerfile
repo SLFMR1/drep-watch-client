@@ -1,12 +1,12 @@
 FROM node:18-slim
 
 # Set environment variables
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome \
-    NODE_ENV=production \
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD="true" \
+    PUPPETEER_EXECUTABLE_PATH="/usr/bin/google-chrome" \
+    NODE_ENV="production" \
     PNPM_HOME="/pnpm" \
     PATH="$PNPM_HOME:$PATH" \
-    NODE_VERSION=18
+    NODE_VERSION="18"
 
 # Install necessary dependencies for Chrome
 RUN apt-get update \
