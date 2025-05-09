@@ -1,12 +1,12 @@
 import QueAnsCard from '~/components/cards/que-ans';
 import { getDrepQuestions } from '~/server';
-import { GetServerSideProps } from 'next';
+import { GetServerSideProps, GetServerSidePropsContext } from 'next';
 import axios from 'axios';
 import { BASE_API_URL } from '~/data/api';
 import DynamicMetatags from '~/components/dynamic-metatags';
 import Image from 'next/image';
 
-export const getServerSideProps: GetServerSideProps = async (ctx) => {
+export const getServerSideProps: GetServerSideProps = async (ctx: GetServerSidePropsContext<{ id: string }>) => {
   const { id } = ctx.query;
   if (!id || typeof id !== 'string') {
     return { notFound: true };

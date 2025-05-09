@@ -1,6 +1,6 @@
 import Answer from "~/components/answer";
 import DynamicMetatags from "~/components/dynamic-metatags";
-import { GetServerSideProps } from "next";
+import { GetServerSideProps, GetServerSidePropsContext } from "next";
 import { BASE_API_URL } from "~/data/api";
 
 type MetaProps = {
@@ -10,7 +10,7 @@ type MetaProps = {
   type: "article" | "website";
 };
 
-export const getServerSideProps: GetServerSideProps<{ meta: MetaProps }> = async (ctx) => {
+export const getServerSideProps: GetServerSideProps<{ meta: MetaProps }> = async (ctx: GetServerSidePropsContext<{ id: string }>) => {
   const { id } = ctx.query;
   if (!id || typeof id !== 'string') {
     return { notFound: true };
