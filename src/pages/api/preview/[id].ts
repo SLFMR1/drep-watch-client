@@ -13,7 +13,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   let browser;
   try {
-    browser = await puppeteer.launch({
+    // Configure Puppeteer to use system Chrome in production
+    const options = {
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -22,8 +23,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         '--disable-gpu',
         '--window-size=600,800'
       ],
-      headless: true
-    });
+      headless: true as const,
+      executablePath: process.env.NODE_ENV === 'production' 
+        ? '/usr/bin/google-chrome'
+        : undefined
+    };
+
+    console.log('Launching Puppeteer with options:', JSON.stringify(options, null, 2));
+    browser = await puppeteer.launch(options);
 
     const page = await browser.newPage();
     
