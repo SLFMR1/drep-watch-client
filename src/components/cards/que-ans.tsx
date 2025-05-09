@@ -40,6 +40,7 @@ interface QueAnsCardProps {
   asked_user?: string;
   drepXHandle?: string;
   drepImage?: string;
+  drepName?: string;
 }
 
 const QueAnsCard: React.FC<QueAnsCardProps> = ({
@@ -50,6 +51,7 @@ const QueAnsCard: React.FC<QueAnsCardProps> = ({
   asked_user,
   drepXHandle,
   drepImage,
+  drepName,
 }: QueAnsCardProps): React.ReactNode => {
   const { route } = useRouter();
   const queryClient = useQueryClient();
@@ -320,7 +322,9 @@ const QueAnsCard: React.FC<QueAnsCardProps> = ({
                 <div>
                   {(answer.drep_name && answer.drep_name.length > 0) 
                     ? (answer.drep_name.length > 16 ? `${answer.drep_name.slice(0, 16)}...` : answer.drep_name)
-                    : (answer.drep_id.length > 16 ? `${answer.drep_id.slice(0, 16)}...` : answer.drep_id)
+                    : (drepName && drepName.length > 0)
+                      ? (drepName.length > 16 ? `${drepName.slice(0, 16)}...` : drepName)
+                      : (answer.drep_id.length > 16 ? `${answer.drep_id.slice(0, 16)}...` : answer.drep_id)
                   }
                 </div>
               </div>
@@ -328,7 +332,11 @@ const QueAnsCard: React.FC<QueAnsCardProps> = ({
               <div className="">
                 <LetterAvatar
                   rounded
-                  username={(answer.drep_name && answer.drep_name.length > 0) ? answer.drep_name : answer.drep_id}
+                  username={(answer.drep_name && answer.drep_name.length > 0) 
+                    ? answer.drep_name 
+                    : (drepName && drepName.length > 0)
+                      ? drepName
+                      : answer.drep_id}
                   dimension={32}
                   src={drepImage}
                 />

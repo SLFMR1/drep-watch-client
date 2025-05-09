@@ -24,8 +24,9 @@ export const extractXHandle = (url: string): string | null => {
  * Share content on X.com (formerly Twitter)
  * @param url - The URL to share
  * @param text - The text to share with the URL
+ * @param previewImageUrl - Optional preview image URL
  */
-export const shareOnX = (url: string, text: string): void => {
+export const shareOnX = (url: string, text: string, previewImageUrl?: string): void => {
   const encodedText = encodeURIComponent(text);
   const encodedUrl = encodeURIComponent(url);
   const shareUrl = `https://x.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`;
@@ -73,6 +74,7 @@ export const shareQuestionAnswer = (
 ): void => {
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
   const url = `${baseUrl}/answer/${questionId}`;
+  const previewImageUrl = `${baseUrl}/api/preview/${questionId}`;
   
   let text = '';
   if (xHandle) {
@@ -83,5 +85,5 @@ export const shareQuestionAnswer = (
     text = `"${questionTitle}" - Check out this Q&A on @dRepWatch!`;
   }
   
-  shareOnX(url, text);
+  shareOnX(url, text, previewImageUrl);
 }; 
