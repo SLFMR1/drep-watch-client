@@ -8,8 +8,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   // Build the URL to the card snapshot page
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-  const url = `${baseUrl}/card-snapshot/${id}`;
+  const frontendBaseUrl = process.env.NEXT_PUBLIC_FRONTEND_URL || 'https://www.drep.watch';
+  const url = `${frontendBaseUrl}/card-snapshot/${id}`;
 
   let browser;
   try {
@@ -62,17 +62,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     await browser.close();
 
+    // Set cache headers for better performance
     res.setHeader('Content-Type', 'image/png');
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.setHeader('Access-Control-Allow-Origin', '*');
     res.send(buffer);
   } catch (error) {
     console.error('Puppeteer error:', error);
     if (browser) await browser.close();
     
-    // Return a fallback image or error response
-    res.status(500).json({ 
-      error: 'Failed to generate preview image',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    });
+    // Return the default image instead of an error
+    res.redirect(307, 'https://c-ipfs-gw.nmkr.io/ipfs/QmNWssukxYXoo2MHTu6BG9ScQpbYjDYjAm8qQsgRcWjpjd');
   }
 } 

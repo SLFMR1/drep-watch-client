@@ -3,13 +3,13 @@ import Head from "next/head";
 const Metatags: React.FC = (): React.ReactNode => {
   return (
     <Head>
-      <title>dRepWatch – Cardano dRep Insights</title>
-      <meta name="description" content="Track and learn about Cardano dReps, their activity, and Q&A sessions." />
+      <title>dRepWatch – Cardano Governance Insights</title>
+      <meta name="description" content="dRepWatch connects Cardano delegators and their dReps! Track dRep activity, ask questions, and stay informed about Cardano governance." />
 
       <meta property="og:url" content="https://www.drep.watch" />
       <meta property="og:type" content="website" />
-      <meta property="og:title" content="dRepWatch – Cardano dRep Insights" />
-      <meta property="og:description" content="Track and learn about Cardano dReps, their activity, and Q&A sessions." />
+      <meta property="og:title" content="dRepWatch – Cardano Governance Insights" />
+      <meta property="og:description" content="dRepWatch connects Cardano delegators and their dReps! Track dRep activity, ask questions, and stay informed about Cardano governance." />
       <meta
         property="og:image"
         content="https://c-ipfs-gw.nmkr.io/ipfs/QmNWssukxYXoo2MHTu6BG9ScQpbYjDYjAm8qQsgRcWjpjd"
@@ -18,8 +18,8 @@ const Metatags: React.FC = (): React.ReactNode => {
       <meta name="twitter:card" content="summary_large_image" />
       <meta property="twitter:domain" content="drep.watch" />
       <meta property="twitter:url" content="https://www.drep.watch" />
-      <meta name="twitter:title" content="dRepWatch – Cardano dRep Insights" />
-      <meta name="twitter:description" content="Track and learn about Cardano dReps, their activity, and Q&A sessions." />
+      <meta name="twitter:title" content="dRepWatch – Cardano Governance Insights" />
+      <meta name="twitter:description" content="dRepWatch connects Cardano delegators and their dReps! Track dRep activity, ask questions, and stay informed about Cardano governance." />
       <meta
         name="twitter:image"
         content="https://c-ipfs-gw.nmkr.io/ipfs/QmNWssukxYXoo2MHTu6BG9ScQpbYjDYjAm8qQsgRcWjpjd"

@@ -9,10 +9,10 @@ interface DynamicMetatagsProps {
 }
 
 const DynamicMetatags: React.FC<DynamicMetatagsProps> = ({
-  title = "dRepWatch – Cardano dRep Insights",
-  description = "Track and learn about Cardano dReps, their activity, and Q&A sessions.",
+  title = "dRepWatch – Cardano Governance Insights",
+  description = "dRepWatch connects Cardano delegators and their dReps!",
   imageUrl = "https://c-ipfs-gw.nmkr.io/ipfs/QmNWssukxYXoo2MHTu6BG9ScQpbYjDYjAm8qQsgRcWjpjd",
-  type = "website"
+  type = "article"
 }) => {
   const router = useRouter();
   const url = `${typeof window !== 'undefined' ? window.location.origin : 'https://drep.watch'}${router.asPath}`;

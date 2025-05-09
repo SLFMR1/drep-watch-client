@@ -36,8 +36,9 @@ export const getServerSideProps: GetServerSideProps<{ meta: MetaProps }> = async
       ? `${question?.question_title} - ${answerData.answer.substring(0, 150)}...`
       : "Track and learn about Cardano dReps, their activity, and Q&A sessions.";
 
-    // Generate preview image URL
-    const previewImageUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://drep.watch'}/api/preview/${id}`;
+    // Generate preview image URL - use absolute URL for social media crawlers
+    const frontendBaseUrl = process.env.NEXT_PUBLIC_FRONTEND_URL || 'https://www.drep.watch';
+    const previewImageUrl = `${frontendBaseUrl}/api/preview/${id}`;
 
     return {
       props: {
