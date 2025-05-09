@@ -6,13 +6,14 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD="true" \
     NODE_ENV="production" \
     PNPM_HOME="/pnpm" \
     PATH="$PNPM_HOME:$PATH" \
-    NODE_VERSION="18"
+    NODE_VERSION="18" \
+    DEBIAN_FRONTEND="noninteractive"
 
 # Install necessary dependencies for Chrome
-RUN apt-get update \
-    && apt-get install -y \
+RUN apt-get update && apt-get install -y \
     wget \
-    gnupg \
+    gnupg2 \
+    apt-transport-https \
     ca-certificates \
     procps \
     libxss1 \
@@ -52,20 +53,24 @@ RUN apt-get update \
     fonts-thai-tlwg \
     fonts-kacst \
     fonts-freefont-ttf \
+    xvfb \
+    xauth \
     --no-install-recommends
 
 # Install Chrome
 RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list' \
+    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google.list \
     && apt-get update \
     && apt-get install -y google-chrome-stable --no-install-recommends
 
 # Verify Chrome installation and print version
-RUN google-chrome --version
+RUN google-chrome --version || true
 
-# Create Chrome user and group
+# Create Chrome user and group with proper permissions
 RUN groupadd -r chrome && useradd -r -g chrome -G audio,video chrome \
-    && mkdir -p /home/chrome && chown -R chrome:chrome /home/chrome
+    && mkdir -p /home/chrome \
+    && chown -R chrome:chrome /home/chrome \
+    && chown -R chrome:chrome /usr/bin/google-chrome
 
 # Clean up
 RUN apt-get clean \

@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import puppeteer from 'puppeteer';
+import { execSync } from 'child_process';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query;
@@ -13,7 +14,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   let browser;
   try {
-    // Configure Puppeteer to use system Chrome in production
+    // Verify Chrome is installed
+    const chromePath = process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome';
+    try {
+      execSync(`${chromePath} --version`);
+      console.log('Chrome is available at:', chromePath);
+    } catch (error) {
+      console.error('Chrome verification failed:', error);
+      throw new Error('Chrome is not properly installed');
+    }
+
+    // Configure Puppeteer
     const options = {
       args: [
         '--no-sandbox',
@@ -24,9 +35,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         '--window-size=600,800'
       ],
       headless: true as const,
-      executablePath: process.env.NODE_ENV === 'production' 
-        ? '/usr/bin/google-chrome'
-        : undefined
+      executablePath: chromePath,
+      ignoreHTTPSErrors: true
     };
 
     console.log('Launching Puppeteer with options:', JSON.stringify(options, null, 2));
