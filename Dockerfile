@@ -64,13 +64,12 @@ RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key
     && apt-get install -y google-chrome-stable --no-install-recommends
 
 # Verify Chrome installation and print version
-RUN google-chrome --version || true
+RUN google-chrome --version
 
 # Create Chrome user and group with proper permissions
 RUN groupadd -r chrome && useradd -r -g chrome -G audio,video chrome \
     && mkdir -p /home/chrome \
-    && chown -R chrome:chrome /home/chrome \
-    && chown -R chrome:chrome /usr/bin/google-chrome
+    && chown -R chrome:chrome /home/chrome
 
 # Clean up
 RUN apt-get clean \
