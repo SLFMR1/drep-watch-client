@@ -88,7 +88,7 @@ export default function CardSnapshot(props: any) {
 
   // Generate preview image URL - only if we have a question ID
   const previewImageUrl = question?.id 
-    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/api/preview/${question.id}`
+    ? `${process.env.NEXT_PUBLIC_BASE_URL || 'https://drep.watch'}/api/preview/${question.id}`
     : undefined;
 
   return (

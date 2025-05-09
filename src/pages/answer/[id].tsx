@@ -1,51 +1,64 @@
 import Answer from "~/components/answer";
 import DynamicMetatags from "~/components/dynamic-metatags";
-import Layout from "~/layout";
-import { useRouter } from "next/router";
-import { useQuery } from "@tanstack/react-query";
+import { GetServerSideProps } from "next";
 import { BASE_API_URL } from "~/data/api";
 
-export default function AnswerPage() {
-  const router = useRouter();
-  const { id } = router.query;
+type MetaProps = {
+  title: string;
+  description: string;
+  imageUrl: string;
+  type: "article" | "website";
+};
 
-  const { data: questionData } = useQuery({
-    queryKey: ["question-data", id],
-    queryFn: async () => {
-      if (!id) return null;
-      const questionRes = await fetch(`${BASE_API_URL}/api/v1/questions/${id}`);
-      return questionRes.json();
-    },
-    enabled: !!id,
-  });
+export const getServerSideProps: GetServerSideProps<{ meta: MetaProps }> = async (ctx) => {
+  const { id } = ctx.query;
+  if (!id || typeof id !== 'string') {
+    return { notFound: true };
+  }
 
-  const { data: answerData } = useQuery({
-    queryKey: ["answer-data", id],
-    queryFn: async () => {
-      if (!id) return null;
-      const answerRes = await fetch(`${BASE_API_URL}/api/v1/answers/${id}`);
-      return answerRes.json();
-    },
-    enabled: !!id,
-  });
+  try {
+    // Fetch question
+    const questionRes = await fetch(`${BASE_API_URL}/api/v1/questions/${id}`);
+    if (!questionRes.ok) return { notFound: true };
+    const questionData = await questionRes.json();
+    const question = questionData.question;
 
-  const previewImageUrl = id ? `${typeof window !== 'undefined' ? window.location.origin : ''}/api/preview/${id}` : undefined;
-  const title = questionData?.question?.question_title 
-    ? `${questionData.question.question_title} - dRepWatch`
-    : "dRepWatch – Cardano dRep Insights";
-  
-  const description = answerData?.answer?.answer
-    ? `${questionData?.question?.question_title} - ${answerData.answer.answer.substring(0, 150)}...`
-    : "Track and learn about Cardano dReps, their activity, and Q&A sessions.";
+    // Fetch answer
+    const answerRes = await fetch(`${BASE_API_URL}/api/v1/answers/${id}`);
+    const answerData = answerRes.ok ? await answerRes.json() : null;
 
+    // Generate meta title and description
+    const title = question?.question_title 
+      ? `${question.question_title} - dRepWatch`
+      : "dRepWatch – Cardano dRep Insights";
+    
+    const description = answerData?.answer
+      ? `${question?.question_title} - ${answerData.answer.substring(0, 150)}...`
+      : "Track and learn about Cardano dReps, their activity, and Q&A sessions.";
+
+    // Generate preview image URL
+    const previewImageUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://drep.watch'}/api/preview/${id}`;
+
+    return {
+      props: {
+        meta: {
+          title,
+          description,
+          imageUrl: previewImageUrl,
+          type: "article" as const
+        }
+      }
+    };
+  } catch (error) {
+    console.error('Error fetching data:', error);
+    return { notFound: true };
+  }
+};
+
+export default function AnswerPage({ meta }: { meta: MetaProps }) {
   return (
     <>
-      <DynamicMetatags
-        title={title}
-        description={description}
-        imageUrl={previewImageUrl}
-        type="article"
-      />
+      <DynamicMetatags {...meta} />
       <Answer />
     </>
   );
